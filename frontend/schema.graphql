@@ -1,0 +1,30 @@
+schema {
+  query: QueryRoot
+  mutation: MutationRoot
+}
+
+"""Directs the executor to query only when the field exists."""
+directive @ifdef on FIELD
+
+"""
+Implement the DateTime<Utc> scalar
+
+The input/output is a string in RFC3339 format.
+"""
+scalar DateTime
+
+type MutationRoot {
+  login(username: String!, password: String!): User!
+}
+
+type QueryRoot {
+  stub: Int!
+}
+
+type User {
+  id: Int!
+  username: String!
+  password: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}

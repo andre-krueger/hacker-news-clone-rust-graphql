@@ -1,0 +1,7 @@
+schema: http://localhost:8000/graphql
+extensions:
+  codegen:
+    generates:
+      ./schema.graphql:
+        plugins:
+          - schema-ast
