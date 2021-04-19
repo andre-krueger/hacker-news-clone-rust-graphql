@@ -120,3 +120,4 @@ target/
 **/*.rs.bk
 
 **/schema.graphql
+.eslintcache

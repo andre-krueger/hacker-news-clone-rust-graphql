@@ -1,6 +1,4 @@
 {
-  "name": "frontend",
-  "version": "0.0.1",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -10,29 +8,34 @@
     "test": "jest",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "update-all": "ncu -u && npm update",
-    "download-schema": "graphql codegen"
+    "download-schema": "graphql codegen",
+    "prepare": "cd .. && husky install frontend/.husky"
   },
   "dependencies": {
-    "npm-check-updates": "11.4.1",
-    "react": "17.0.2",
+    "@shopify/restyle": "1.4.0",
+    "react": "17.0.1",
     "react-native": "0.64.0"
   },
   "devDependencies": {
     "@babel/core": "7.13.15",
     "@babel/runtime": "7.13.10",
-    "@graphql-cli/codegen": "1.17.22",
-    "@graphql-codegen/schema-ast": "1.18.1",
+    "@graphql-cli/codegen": "1.17.23",
+    "@graphql-codegen/schema-ast": "1.18.2",
     "@react-native-community/eslint-config": "2.0.0",
     "@types/jest": "26.0.22",
     "@types/react": "17.0.3",
-    "@types/react-native": "0.64.2",
+    "@types/react-native": "0.64.4",
     "@types/react-test-renderer": "17.0.1",
     "babel-jest": "26.6.3",
-    "eslint": "7.23.0",
+    "eslint": "7.24.0",
+    "eslint-config-prettier": "8.2.0",
     "graphql-cli": "4.1.0",
+    "husky": "6.0.0",
     "jest": "26.6.3",
+    "lint-staged": "10.5.4",
     "metro-react-native-babel-preset": "0.65.2",
-    "react-test-renderer": "17.0.2",
+    "npm-check-updates": "11.4.1",
+    "react-test-renderer": "17.0.1",
     "typescript": "4.2.4"
   },
   "jest": {
@@ -45,5 +48,9 @@
       "json",
       "node"
     ]
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": "eslint --cache --fix",
+    "*.json": "prettier --write"
   }
 }
