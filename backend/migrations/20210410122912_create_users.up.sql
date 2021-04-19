@@ -1,4 +1,3 @@
--- Add up migration script here
 CREATE OR REPLACE FUNCTION trigger_set_timestamp()
     RETURNS TRIGGER AS
 $$
@@ -19,10 +18,12 @@ CREATE TABLE IF NOT EXISTS users
     UNIQUE (username)
 );
 
+CREATE TYPE role AS ENUM ('admin', 'user');
+
 CREATE TABLE IF NOT EXISTS roles
 (
     id        SERIAL,
-    role_name TEXT NOT NULL,
+    role_name role NOT NULL,
     PRIMARY KEY (id),
     UNIQUE (role_name)
 );

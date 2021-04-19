@@ -5,5 +5,5 @@ let
 in with pkgs;
 mkShell {
   buildInputs =
-    [ rustup cargo-outdated cargo-watch sqlx-cli cargo-edit pkgs.nodejs-15_x ];
+    [ cargo-outdated cargo-watch sqlx-cli cargo-edit nodejs-15_x ];
 }
