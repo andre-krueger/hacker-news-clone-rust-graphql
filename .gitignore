@@ -22,7 +22,7 @@ DerivedData
 project.xcworkspace
 
 # Gradle
-/build/
+**/build/
 /packages/react-native-codegen/android/build/
 /packages/react-native-codegen/android/gradlePlugin-build/gradlePlugin/build
 /packages/react-native-gradle-plugin/build/
@@ -121,3 +121,5 @@ target/
 
 **/schema.graphql
 .eslintcache
+__generated__
+.tsconfig-lint.json

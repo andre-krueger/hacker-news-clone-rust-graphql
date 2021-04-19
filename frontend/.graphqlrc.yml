@@ -1,4 +1,4 @@
-schema: http://localhost:8000/graphql
+schema: ${SCHEMA_URL}
 extensions:
   codegen:
     generates:

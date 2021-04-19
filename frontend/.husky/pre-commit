@@ -3,4 +3,3 @@
 
 cd frontend
 npx lint-staged
-npx tsc

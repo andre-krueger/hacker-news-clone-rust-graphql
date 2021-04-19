@@ -1,8 +1,8 @@
 import React from 'react';
-import {View} from 'react-native';
+import Box from './Box';
 
 function Button() {
-  return <View />;
+  return <Box backgroundColor={'cardPrimaryBackground'} />;
 }
 
 export default Button;
