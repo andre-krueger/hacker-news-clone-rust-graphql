@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::database::HasValueRef;
 use sqlx::error::BoxDynError;
-use sqlx::{Decode, Error, FromRow, Postgres};
+use sqlx::{Decode, Error, FromRow, PgPool, Postgres};
 use std::sync::Arc;
 use tokio::sync::{RwLock, RwLockReadGuard};
 use warp_sessions::Session;
@@ -20,14 +20,6 @@ pub enum Role {
 
 pub struct RoleGuard {
     pub role: Role,
-}
-
-// TODO move to auth package
-pub async fn get_role(session: &Arc<RwLock<Session>>) -> Option<Role> {
-    let x: RwLockReadGuard<Session> = session.read().await;
-    let nn = x.get::<String>("user");
-
-    Some(Role::Admin)
 }
 
 #[async_trait::async_trait]

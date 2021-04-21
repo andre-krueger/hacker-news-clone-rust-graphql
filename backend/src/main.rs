@@ -2,9 +2,9 @@ use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
 use async_graphql::{EmptySubscription, Schema};
 use async_graphql_warp::Response;
 use async_redis_session::RedisSessionStore;
+use backend::auth::get_role;
 use backend::database::pool::init_pool;
 use backend::graphql::resolvers::{MutationRoot, QueryRoot};
-use backend::graphql::schema::get_role;
 use dotenv::dotenv;
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -25,7 +25,6 @@ async fn main() {
     let graphql_post = warp::post()
         .and(warp::path("graphql"))
         .map(move || pool.clone())
-        .and(warp::cookie::optional::<String>("sid"))
         .and(async_graphql_warp::graphql(schema.clone()))
         .and(warp_sessions::request::with_session(
             session_store,
@@ -42,18 +41,17 @@ async fn main() {
         ))
         .and_then(
             |pool,
-             sid: Option<String>,
              (schema, mut request): (
                 Schema<QueryRoot, MutationRoot, EmptySubscription>,
                 async_graphql::Request,
             ),
              mut session_with_store: SessionWithStore<RedisSessionStore>| async move {
                 let shared_session = Arc::new(RwLock::new(session_with_store.session));
-                let maybe_role = get_role(&shared_session).await;
+                let maybe_role = get_role(&pool, &shared_session).await;
                 if let Some(role) = maybe_role {
                     request = request.data(role);
                 }
-                request = request.data(shared_session.clone()).data(sid);
+                request = request.data(shared_session.clone());
                 request = request.data(pool);
                 let resp = schema.execute(request).await;
                 session_with_store.session = Arc::try_unwrap(shared_session).unwrap().into_inner();

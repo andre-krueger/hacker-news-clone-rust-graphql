@@ -29,6 +29,9 @@ export const theme = createTheme({
       lineHeight: 24,
       color: 'mainForeground',
     },
+    icon: {
+      fontSize: 32,
+    },
   },
   cardVariants: {
     primary: {

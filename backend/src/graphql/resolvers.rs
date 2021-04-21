@@ -30,17 +30,8 @@ impl QueryRoot {
                 updated_at: data.updated_at,
                 role: data.role,
             })
-            // .map(|row: PgRow| User {
-            //     id: row.get("id"),
-            //     role: row.get("role_name"),
-            //     created_at: row.get("created_at"),
-            //     updated_at: row.get("updated_at"),
-            //
-            //     username: row.get("username"),
-            // })
             .fetch_one(&*pool)
             .await;
-            println!("test");
         } else {
             user = sqlx::query_file!(
                 "src/database/queries/user_by_id.sql",
@@ -80,13 +71,13 @@ impl MutationRoot {
         password: String,
     ) -> Result<User, IncorrectLoginCredentials> {
         let pool = ctx.data::<PgPool>().unwrap();
-        let mut session: RwLockWriteGuard<Session> =
-            ctx.data::<Arc<RwLock<Session>>>().unwrap().write().await;
-        session.insert("user", "1".to_string()).unwrap();
         let mut user_password;
-        let user = match sqlx::query!("SELECT * FROM users WHERE username = $1", username)
-            .fetch_one(&*pool)
-            .await
+        let user = match sqlx::query_file!(
+            "src/database/queries/user_by_username_with_role.sql",
+            username
+        )
+        .fetch_one(&*pool)
+        .await
         {
             Ok(user) => {
                 user_password = user.password;
@@ -95,8 +86,7 @@ impl MutationRoot {
                     username: user.username,
                     created_at: user.created_at,
                     updated_at: user.updated_at,
-                    // TODO: do a join for the user role
-                    role: Role::Admin,
+                    role: user.role,
                 }
             }
             _ => return Err(IncorrectLoginCredentials),
@@ -104,7 +94,12 @@ impl MutationRoot {
         let argon2 = Argon2::default();
         let parsed_hash = PasswordHash::new(&user_password).unwrap();
         return match argon2.verify_password(password.as_bytes(), &parsed_hash) {
-            Ok(_) => Ok(user),
+            Ok(_) => {
+                let mut session: RwLockWriteGuard<Session> =
+                    ctx.data::<Arc<RwLock<Session>>>().unwrap().write().await;
+                session.insert("user", user.id).unwrap();
+                Ok(user)
+            }
             _ => Err(IncorrectLoginCredentials),
         };
     }
