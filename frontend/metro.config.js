@@ -1,9 +1,11 @@
 module.exports = {
   transformer: {
-    getTransformOptions: async () => ({
+    getTransformOptions: () => ({
       transform: {
         experimentalImportSupport: false,
-        inlineRequires: true,
+        // Set to false to make Storybook work
+        // See: https://github.com/storybookjs/react-native/issues/152
+        inlineRequires: false,
       },
     }),
   },

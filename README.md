@@ -10,6 +10,9 @@ To recompile and restart the server, run `cargo watch -x "run"`.
 
 To create an admin user, run `cargo run --bin create_admin USERNAME PASSWORD`.
 
-To regenerate the schema on any backend change, run `cargo watch -s "(cd ../frontend; npm run download-schema)"`
+To regenerate the schema on any backend change, run `cargo watch -s "(cd ../frontend; yarn download-schema)"`
 
-Before running, be sure to reverse both 8000 and 8081
+Before running, be sure to reverse both 8000 and 8081 via adb reverse.
+
+### TODO
+- [] Check progress on this ticket https://github.com/supermacro/neverthrow/issues/212

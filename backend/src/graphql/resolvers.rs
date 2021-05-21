@@ -1,9 +1,13 @@
+#![deny(unused_must_use)]
 use crate::error::{IncorrectLoginCredentials, UserNotFound};
 use crate::graphql::schema::{Role, RoleGuard, User};
 use argon2::PasswordHash;
 use argon2::{Argon2, PasswordVerifier};
 use async_graphql::guard::Guard;
-use async_graphql::{Context, Object, ID};
+use async_graphql::{
+    Context, Error, ErrorExtensionValues, ErrorExtensions, FieldError, FieldResult, Object,
+    ResultExt, ID,
+};
 use sqlx::postgres::PgRow;
 use sqlx::{PgPool, Row};
 use std::collections::HashSet;
@@ -11,13 +15,45 @@ use std::sync::Arc;
 use tokio::sync::{RwLock, RwLockWriteGuard};
 use warp_sessions::Session;
 
+use core::fmt;
+use std::fmt::Formatter;
+use std::num::ParseIntError;
+use thiserror::Error;
+
 pub struct QueryRoot;
+
+#[derive(Debug, Error)]
+pub enum ResolverError {
+    #[error("User not found")]
+    UserNotFound(#[from] sqlx::Error),
+    // #[error("st")]
+    // LUserNotFound(#[from] std::num::ParseIntError),
+    // #[error("bbb")]
+    // Bla(#[from] std::num::ParseIntError),
+    #[error("nnt")]
+    Cool,
+}
+
+impl ErrorExtensions for ResolverError {
+    // lets define our base extensions
+    fn extend(&self) -> FieldError {
+        self.extend_with(|err, e| match err {
+            ResolverError::UserNotFound(error) => {
+                println!("net");
+                e.set("code", "USER_NOT_FOUND");
+                e.set("reason", error.to_string())
+            }
+            _ => {} // MyError::ServerError(reason) => e.set("reason", reason.to_string()),
+                    // MyError::ErrorWithoutExtensions => {}
+        })
+    }
+}
 
 #[Object]
 impl QueryRoot {
-    async fn user(&self, ctx: &Context<'_>, id: ID) -> Result<User, UserNotFound> {
+    async fn user(&self, ctx: &Context<'_>, id: ID) -> FieldResult<User> {
         let pool = ctx.data::<PgPool>().unwrap();
-        let mut user;
+        let mut user: Result<User, sqlx::Error>; //: Result<User, _>;
         if ctx.look_ahead().field("role").exists() {
             user = sqlx::query_file!(
                 "src/database/queries/user_by_id_with_role.sql",
@@ -47,14 +83,50 @@ impl QueryRoot {
             .fetch_one(&*pool)
             .await;
         }
-        return match user {
-            Ok(user) => Ok(user),
-            _ => return Err(UserNotFound),
-        };
+        let bx = ErrorExtensionValues::default();
+        // let x = Ok("te".parse()?);
+        // Ok("t".parse()).map_err(|e: Error| e.extend())
+        // let nnnn = user.map_err(|e| e.extend());
+        // Ok::<i32, Error>("t".parse().extend()?)
+        // Err(ResolverError::Cool.extend())
+        // Ok("t".parse().map_err(|e: ResolverError| e.extend())?)
+        Ok(user.map_err(|e| ResolverError::UserNotFound(e).extend())?)
+        // Ok::<User, Result<User, ResolverError>>(user?).extend()
+        // Ok(user).map_err(|err: ResolverError| {
+        //     Err("nt".into());
+        //     err.extend()
+        // })?
+        // Err("n".into()).map_err(|e: ResolverError| e.extend()?)
+        // let nn = Ok(user).map_err(|e: ResolverError| e.extend());
+        // nn
+        // Err(ResolverError::Cool).map_err(|e| e.extend())
+        // Err(2).map_err(|e: ResolverError| e.extend())
+        // x.map_err(|e: ResolverError| e.extend())
+        // x?.map_err(|e: ResolverError| e.extend_with(|_, e| e.set("nt", "nt")))
+        // Ok("2l".parse().extend())?
+        // Ok::<User, ResolverError>(user?).extend()
+        // return match user {
+        //     Ok(user) => Ok(user),
+        //     _ => return Err(ResolverError::UserNotFound), // _ => return Err(NotFoundError::NotFound.extend()),
+        // };
     }
 }
 
 pub struct MutationRoot;
+
+#[must_use]
+async fn query_something(pool: &PgPool) {
+    // let x: Result<(), ()> = Err(());
+    // x.is_ok();
+    let x = sqlx::query(r#"ISERT INTO roles (role_name) VALUES('admin')"#)
+        .fetch_one(&*pool)
+        .await;
+}
+
+#[must_use]
+async fn bla(pool: &PgPool) {
+    query_something(pool).await;
+}
 
 #[Object]
 impl MutationRoot {
@@ -71,6 +143,7 @@ impl MutationRoot {
         password: String,
     ) -> Result<User, IncorrectLoginCredentials> {
         let pool = ctx.data::<PgPool>().unwrap();
+        bla(pool).await;
         let mut user_password;
         let user = match sqlx::query_file!(
             "src/database/queries/user_by_username_with_role.sql",

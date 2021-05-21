@@ -1,36 +1,23 @@
-import React from 'react';
-import Box from './Box';
-import Text from './Text';
-import {Pressable} from 'react-native';
-import {useTheme} from '@shopify/restyle';
-import {Theme} from '../theme';
+import React from "react";
+import { Pressable } from "react-native";
+import Text from "./Text";
+import Box from "./Box";
 
-function Button({
-  text,
-  numberOfLines = 1,
-  onPress,
-}: {
-  text: string;
-  numberOfLines?: number;
-  onPress: () => void;
-}) {
-  const theme = useTheme<Theme>();
+type Props = { title: string; onPress: (...args: unknown[]) => void };
+
+function Button({ title, onPress }: Props): JSX.Element {
   return (
-    <Pressable
-      android_ripple={{
-        color: theme.colors.mainForeground,
-        borderless: true,
-      }}
-      onPress={() => onPress()}>
+    <Pressable onPress={onPress}>
       <Box
-        flexShrink={1}
-        backgroundColor={'mainBackground'}
-        style={{backgroundColor: 'red'}}>
-        <Text
-          adjustsFontSizeToFit
-          numberOfLines={numberOfLines}
-          color={'mainForeground'}>
-          {text}
+        backgroundColor={"primaryButtonBackground"}
+        width={130}
+        height={40}
+        justifyContent={"center"}
+        alignItems={"center"}
+        padding={"s"}
+      >
+        <Text adjustsFontSizeToFit numberOfLines={1} variant={"button"}>
+          {title}
         </Text>
       </Box>
     </Pressable>

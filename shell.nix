@@ -4,6 +4,14 @@ let
     { };
 in with pkgs;
 mkShell {
-  buildInputs =
-    [ watchman cargo-outdated cargo-watch sqlx-cli cargo-edit nodejs-14_x ];
+  buildInputs = [
+    openssl
+    watchman
+    cargo-outdated
+    cargo-watch
+    sqlx-cli
+    cargo-edit
+    nodejs-15_x
+    yarn
+  ];
 }
