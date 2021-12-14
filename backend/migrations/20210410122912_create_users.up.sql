@@ -9,7 +9,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS users
 (
-    id         SERIAL,
+    id         SERIAL NOT NULL,
     username   TEXT        NOT NULL,
     password   TEXT        NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -22,7 +22,7 @@ CREATE TYPE role AS ENUM ('admin', 'user');
 
 CREATE TABLE IF NOT EXISTS roles
 (
-    id        SERIAL,
+    id        SERIAL NOT NULL,
     role_name role NOT NULL,
     PRIMARY KEY (id),
     UNIQUE (role_name)

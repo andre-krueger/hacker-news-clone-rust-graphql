@@ -1,6 +1,6 @@
-use crate::error::Forbidden;
-use async_graphql::guard::Guard;
-use async_graphql::{scalar, Context, Enum, FieldResult, SimpleObject};
+use crate::error::{Forbidden, UserNotFound};
+// use async_graphql::guard::Guard;
+use async_graphql::{scalar, Context, Enum, FieldResult, Guard, SimpleObject};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::database::HasValueRef;
@@ -20,6 +20,12 @@ pub enum Role {
 
 pub struct RoleGuard {
     pub role: Role,
+}
+
+impl RoleGuard {
+    pub fn new(role: Role) -> Self {
+        Self { role }
+    }
 }
 
 #[async_trait::async_trait]
@@ -49,4 +55,20 @@ impl User {
     pub async fn id(&self) -> async_graphql::ID {
         self.id.into()
     }
+}
+
+#[derive(async_graphql::SimpleObject)]
+pub struct UserData {
+    pub id: i32,
+}
+
+#[derive(async_graphql::SimpleObject)]
+pub struct UserNotFound2 {
+    pub message: String,
+}
+
+#[derive(async_graphql::Union)]
+pub enum UserResult {
+    UserData(UserData),
+    UserNotFound2(UserNotFound2),
 }

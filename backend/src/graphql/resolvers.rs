@@ -1,20 +1,22 @@
 #![deny(unused_must_use)]
+
 use crate::error::{IncorrectLoginCredentials, UserNotFound};
-use crate::graphql::schema::{Role, RoleGuard, User};
+use crate::graphql::schema::{Role, RoleGuard, User, UserData, UserNotFound2, UserResult};
 use argon2::PasswordHash;
 use argon2::{Argon2, PasswordVerifier};
-use async_graphql::guard::Guard;
+// use async_graphql::guard::Guard;
 use async_graphql::{
-    Context, Error, ErrorExtensionValues, ErrorExtensions, FieldError, FieldResult, Object,
-    ResultExt, ID,
+    connection, Context, Error, ErrorExtensionValues, ErrorExtensions, FieldError, FieldResult,
+    Guard, Object, OutputType, Result, ResultExt, SimpleObject, ID,
 };
 use sqlx::postgres::PgRow;
-use sqlx::{PgPool, Row};
+use sqlx::{FromRow, PgPool, Postgres, Row};
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::{RwLock, RwLockWriteGuard};
 use warp_sessions::Session;
 
+use async_graphql::connection::{query, Connection, Edge, EmptyFields, PageInfo};
 use core::fmt;
 use std::fmt::Formatter;
 use std::num::ParseIntError;
@@ -47,6 +49,91 @@ impl ErrorExtensions for ResolverError {
                     // MyError::ErrorWithoutExtensions => {}
         })
     }
+}
+
+#[derive(SimpleObject)]
+struct ConnectionFields {
+    total_count: i32,
+}
+
+#[derive(SimpleObject)]
+struct Diff {
+    diff: i32,
+}
+
+#[derive(SimpleObject)]
+struct MyConnection<T: Sync + std::marker::Send + OutputType> {
+    edges: Vec<Edge<usize, T, EmptyFields>>,
+    totalCount: usize,
+    page_info: PageInfo,
+}
+
+macro_rules! query_with {
+    ($entity:ident,$pool:expr, $query:literal, $table_name:literal) => {
+        // sqlx::query_as!($entity, "select * from " + $table_name)
+        //     .fetch_all($pool)
+        //     .await
+        //     .unwrap()
+        query_with!($entity, $pool, $query, $table_name, "")
+    };
+    ($entity:ident,$pool:expr, $query:literal,$table_name:literal, $join:expr) => {{
+        let rows = sqlx::query_as!($entity, $query + r#" FROM "# + $table_name + $join,)
+            .fetch_all($pool)
+            .await
+            .unwrap();
+        let mut edges = rows
+            .into_iter()
+            .enumerate()
+            .map(|(index, item)| Edge::new(item.id as usize, item))
+            .collect::<Vec<Edge<usize, $entity, EmptyFields>>>();
+        // let mut connection = Connection::with_additional_fields(false, false, EmptyFields);
+        // let mut connection = Connection::new(false, false);
+        let connection = MyConnection {
+            edges,
+            totalCount: 10,
+            page_info: PageInfo {
+                has_previous_page: false,
+                has_next_page: false,
+                start_cursor: Some("".to_string()),
+                end_cursor: Some("".to_string()),
+            },
+        };
+        Ok::<MyConnection<$entity>, Error>(connection)
+    }};
+}
+
+async fn paginate<T: for<'a> FromRow<'a, PgRow> + std::marker::Send + Unpin + OutputType>(
+    pool: &PgPool,
+) -> Result<MyConnection<T>> {
+    let rows: Vec<T> =
+        // sqlx::query_as::<_, T>(r#"select id,username,created_at,updated_at from users"#)
+        sqlx::query_as::<_, T>(r#"
+SELECT users.id as id, created_at, role_name as "role!: Role", username, updated_at
+FROM users
+         INNER JOIN user_roles ON users.id = user_roles.user_id
+         INNER JOIN roles on user_roles.user_id = roles.id
+"#
+        )
+            .fetch_all(&*pool)
+            .await.unwrap();
+    let mut edges = rows
+        .into_iter()
+        .enumerate()
+        .map(|(index, item)| Edge::new(1 as usize, item))
+        .collect::<Vec<Edge<usize, T, EmptyFields>>>();
+    // let mut connection = Connection::with_additional_fields(false, false, EmptyFields);
+    // let mut connection = Connection::new(false, false);
+    let connection = MyConnection {
+        edges,
+        totalCount: 10,
+        page_info: PageInfo {
+            has_previous_page: false,
+            has_next_page: false,
+            start_cursor: Some("".to_string()),
+            end_cursor: Some("".to_string()),
+        },
+    };
+    Ok(connection)
 }
 
 #[Object]
@@ -109,6 +196,73 @@ impl QueryRoot {
         //     Ok(user) => Ok(user),
         //     _ => return Err(ResolverError::UserNotFound), // _ => return Err(NotFoundError::NotFound.extend()),
         // };
+    }
+
+    async fn numbers(
+        &self,
+        context: &Context<'_>,
+        after: Option<String>,
+        before: Option<String>,
+        first: Option<i32>,
+        last: Option<i32>,
+    ) -> Result<MyConnection<User>> {
+        let pool = context.data::<PgPool>().unwrap();
+        println!("nntnt");
+        query_with!(
+            User,
+            pool,
+            r#"
+SELECT users.id as "id!" , created_at as "created_at!",roles.role_name as "role!: Role", username as "username!", updated_at as "updated_at!"
+        "#,
+            "users",
+            r#"
+         INNER JOIN user_roles ON users.id = user_roles.user_id
+         INNER JOIN roles on user_roles.role_id = roles.id
+            "#
+        )
+        // paginate::<User>(pool).await
+        // Ok(1)
+        // connection::query(
+        //     after,
+        //     before,
+        //     first,
+        //     last,
+        //     |after, before, first, last| async move {
+        //         let mut start = after.map(|after| after + 1).unwrap_or(0);
+        //         let mut end = before.unwrap_or(10000);
+        //         if let Some(first) = first {
+        //             end = (start + first).min(end);
+        //         }
+        //         if let Some(last) = last {
+        //             start = if last > end - start { end } else { end - last };
+        //         }
+        //         let mut connection = Connection::with_additional_fields(
+        //             start > 0,
+        //             end < 10000,
+        //             ConnectionFields { total_count: 10000 },
+        //         );
+        //         connection.append((start..end).map(|n| {
+        //             Edge::with_additional_fields(
+        //                 n,
+        //                 n as i32,
+        //                 Diff {
+        //                     diff: (10000 - n) as i32,
+        //                 },
+        //             )
+        //         }));
+        //         Ok::<_, Error>(connection)
+        //     },
+        // )
+        // .await
+    }
+    async fn cool(&self, doErr: Option<bool>) -> Result<UserResult> {
+        if (doErr.is_some() == true) {
+            Ok(UserResult::UserNotFound2(UserNotFound2 {
+                message: "Not Found".to_string(),
+            }))
+        } else {
+            Ok(UserResult::UserData(UserData { id: 10 }))
+        }
     }
 }
 
@@ -177,7 +331,7 @@ impl MutationRoot {
         };
     }
 
-    #[graphql(guard(RoleGuard(role = "Role::Admin")))]
+    #[graphql(guard = "RoleGuard::new(Role::Admin)")]
     async fn delete_user(
         &self,
         ctx: &Context<'_>,

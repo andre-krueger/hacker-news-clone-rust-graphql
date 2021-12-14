@@ -1,6 +1,6 @@
 use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
 use async_graphql::{EmptySubscription, Schema};
-use async_graphql_warp::Response;
+// use async_graphql_warp::Response;
 use async_redis_session::RedisSessionStore;
 use backend::auth::get_role;
 use backend::database::pool::init_pool;
@@ -9,6 +9,7 @@ use dotenv::dotenv;
 use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use warp::reply::Response;
 use warp::{http::Response as HttpResponse, Filter};
 use warp_sessions::{CookieOptions, SameSiteCookieOption, SessionWithStore};
 
@@ -55,7 +56,10 @@ async fn main() {
                 request = request.data(pool);
                 let resp = schema.execute(request).await;
                 session_with_store.session = Arc::try_unwrap(shared_session).unwrap().into_inner();
-                Ok::<_, Infallible>((Response::from(resp), session_with_store))
+                Ok::<_, Infallible>((
+                    async_graphql_warp::GraphQLResponse::from(resp),
+                    session_with_store,
+                ))
             },
         )
         .untuple_one()
