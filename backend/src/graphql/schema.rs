@@ -1,21 +1,45 @@
+extern crate strum;
+#[macro_use]
 use crate::error::{Forbidden, UserNotFound};
 // use async_graphql::guard::Guard;
+use crate::graphql::resolvers::ConnectionFields;
+use async_graphql::connection::{Connection, EmptyFields};
 use async_graphql::{scalar, Context, Enum, FieldResult, Guard, SimpleObject};
 use chrono::{DateTime, Utc};
+use serde;
 use serde::{Deserialize, Serialize};
 use sqlx::database::HasValueRef;
 use sqlx::error::BoxDynError;
 use sqlx::{Decode, Error, FromRow, PgPool, Postgres};
+use std::string::ToString;
 use std::sync::Arc;
+use strum::Display;
 use tokio::sync::{RwLock, RwLockReadGuard};
 use warp_sessions::Session;
 
 #[derive(sqlx::Type, Enum, Copy, Clone, Eq, PartialEq, Debug)]
 #[sqlx(rename_all = "lowercase")]
+#[graphql(rename_items = "PascalCase")]
 pub enum Role {
     Admin,
     User,
     Guest,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Display)]
+#[graphql(rename_items = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum UserColumns {
+    Id,
+    Username,
+    Role,
+    CreatedAt,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Display)]
+pub enum OrderBy {
+    ASC,
+    DESC,
 }
 
 pub struct RoleGuard {
@@ -39,7 +63,7 @@ impl Guard for RoleGuard {
     }
 }
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, sqlx::FromRow)]
 #[graphql(complex)]
 pub struct User {
     #[graphql(skip)]
@@ -49,6 +73,22 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
     pub role: Role,
 }
+// macro_rules! choose_fields {
+//     (
+//         $parent:ident,
+//         $StructName:ident { $($manual_fields:tt)* },
+//         $($field:ident),+ $(,)?
+//     ) => {
+//         $StructName {
+//         $(
+//             $field: choose(self.$field().clone(), $parent.$field().clone()),
+//         )+
+//             $($manual_fields)*
+//         }
+//     }
+// }
+//
+// choose_fields!(User, username);
 
 #[async_graphql::ComplexObject]
 impl User {
@@ -67,8 +107,30 @@ pub struct UserNotFound2 {
     pub message: String,
 }
 
+#[derive(async_graphql::SimpleObject)]
+pub struct PaginationIncorrect {
+    pub message: String,
+}
+
 #[derive(async_graphql::Union)]
 pub enum UserResult {
     UserData(UserData),
     UserNotFound2(UserNotFound2),
+    // PaginationIncorrect{"n"},
+    PaginationIncorrect(PaginationIncorrect),
+    Connection(Connection<usize, User, ConnectionFields, EmptyFields>),
+}
+
+impl Default for PaginationIncorrect {
+    fn default() -> Self {
+        //     UserResult {
+        //     // PaginationIncorrect {
+        //     //     message: "".to_string(),
+        //     // }
+        //
+        // }
+        PaginationIncorrect {
+            message: "Incorrect pagination".to_string(),
+        }
+    }
 }
