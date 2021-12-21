@@ -366,6 +366,7 @@ dependencies = [
  "dotenv",
  "field_types",
  "futures",
+ "itertools",
  "log",
  "ormx",
  "phf",

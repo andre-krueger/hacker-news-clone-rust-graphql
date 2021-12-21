@@ -35,3 +35,4 @@ strum = { version = "0.23", features = ["derive"] }
 derive_more = {version="0.99.17",  default_features=false, features=["display"]}
 regex = "1.5"
 field_types = "*"
+itertools = "0.10.2"

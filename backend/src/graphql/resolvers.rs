@@ -119,11 +119,6 @@ macro_rules! query_with {
     //     )
     // };
     ($entity:ident,$pool:expr, $query:literal,$table_name:literal, $id_column:expr, $after:expr, $before:expr, $first:expr, $last:expr, $join:expr, $order_by_column:expr, $order_by: expr,$filter:expr) => {{
-
-        // let x =concat!("", cool_stuff!());
-        // let xxxb =sqlx::query_as!($entity, concat!("")).fetch_all($pool).await;
-        // let xxx = sqlx::query_as!($entity, concat!("select * from ",cool_stuff!())).fetch_all($pool).await;
-        //      let x=   sqlx::query_as::<_, $entity>(&b).fetch_all($pool).await;
         if let Some(_first) = $first {
             if _first < 0 {
 
@@ -159,6 +154,11 @@ macro_rules! query_with {
                 //     ,
                 //     first
                 // )
+                let order_by_text =  if $order_by_column.is_empty() {
+                    ""
+                } else {
+                    "ORDER_BY"
+                };
                 rows = sqlx::query_as::<_, $entity>(
                     // &(
                     //     "SELECT * FROM (".to_owned()
@@ -171,12 +171,13 @@ macro_rules! query_with {
                     //     + " ASC LIMIT $1 ) AS _ ORDER BY  "
                     //     + $order_by_column + " " + $order_by
                     // )
-                    &*format!("SELECT * FROM ({} FROM {} {} ORDER BY {} ASC LIMIT $1) AS _ {} ORDER BY {} {}",
+                    &*format!("SELECT * FROM ({} FROM {} {} ORDER BY {} ASC LIMIT $1) AS _ {} {} {} {}",
                     $query,
                     $table_name,
                     $join,
                     $id_column,
                         $filter,
+                    order_by_text,
                         $order_by_column,
                         $order_by
                     )
@@ -298,112 +299,9 @@ macro_rules! query_with {
     }};
 }
 
-macro_rules! cool_stuff {
-    ($t: expr) => {
-        "posts"
-    };
-}
-
-async fn paginate<T: for<'a> FromRow<'a, PgRow> + std::marker::Send + Unpin + OutputType>(
-    pool: &PgPool,
-) -> Result<MyConnection<T>> {
-    let rows: Vec<T> =
-        // sqlx::query_as::<_, T>(r#"select id,username,created_at,updated_at from users"#)
-        sqlx::query_as::<_, T>(r#"
-SELECT users.id as id, created_at, role_name as "role!: Role", username, updated_at
-FROM users
-         INNER JOIN user_roles ON users.id = user_roles.user_id
-         INNER JOIN roles on user_roles.user_id = roles.id
-"#
-        )
-            .fetch_all(&*pool)
-            .await?;
-    let mut edges = rows
-        .into_iter()
-        .enumerate()
-        .map(|(index, item)| Edge::new(1 as usize, item))
-        .collect::<Vec<Edge<usize, T, EmptyFields>>>();
-    // let mut connection = Connection::with_additional_fields(false, false, EmptyFields);
-    // let mut connection = Connection::new(false, false);
-    let connection = MyConnection {
-        edges,
-        totalCount: 10,
-        page_info: PageInfo {
-            has_previous_page: false,
-            has_next_page: false,
-            start_cursor: Some("".to_string()),
-            end_cursor: Some("".to_string()),
-        },
-    };
-    Ok(connection)
-}
-
-extern crate derive_more;
-
-// use the derives that you want in the file
-use derive_more::Display;
-use log::kv::ToValue;
 use regex::Regex;
 
-#[derive(Display)]
-#[display(
-    fmt = "{}{}",
-    r#"match username {
-Some(Cond{eq}) => ("username".to_owned()+"="+eq).to_string(),
-None => "".to_string()
-}"#,
-    r#"match and {
-Some(Stuff{username}) => (" AND username".to_owned()+"="+&username.eq).to_string(),
-None => "".to_string()
-}"#
-)]
-pub struct StuffAndOr {
-    username: Option<Cond>,
-    and: Option<Stuff>,
-    or: Option<Stuff>, // bla: Option<i32>,
-}
-
-pub struct Stuff {
-    username: Cond,
-    // bla: Option<i32>,
-}
-
-pub struct Cond {
-    eq: String,
-}
-
 #[derive(async_graphql::InputObject)]
-// #[display(
-//     fmt = "{}{}",
-// //     r#"match id {
-// // Some(Condition{equals}) => "id = 10".to_string(),
-// // None => "".to_string()
-// // }"#,
-// //     r#"match username {
-// // Some(Condition{equals}) => ("username".to_owned()+"="+equals).to_string(),
-// // None => "".to_string()
-// // }"#,
-//     r#"match and {
-// Some(MyInput{username:Some(Condition{equals:Some(equals)}),..}) => (" AND username".to_owned()+" = '" + &equals + "'").to_string(),
-// Some(MyInput{id:Some(Condition{equals:Some(equals)}),..}) => (" AND id".to_owned()+" = "+ &equals.to_string()).to_string(),
-// _ => "".to_string()
-// }"#,
-//     r#"match or {
-// Some(MyInput{username:Some(Condition{equals:Some(equals)}),..}) => (" OR username".to_owned()+" = '" + &equals + "'").to_string(),
-// Some(MyInput{id:Some(Condition{equals:Some(equals)}),..}) => (" OR id".to_owned()+" = "+ &equals.to_string()).to_string(),
-// _ => "".to_string()
-// }"#
-// )]
-pub struct MyInputWithAndOr {
-    // id: Option<Condition<i32>>,
-    // username: Option<Condition<String>>,
-    and: Option<MyInput>,
-    or: Option<MyInput>,
-}
-
-use field_types::{FieldName, FieldType};
-
-#[derive(async_graphql::InputObject, FieldType, FieldName)]
 pub struct UsersFilterInput {
     pub not: Box<Option<UsersFilterInput>>,
     pub and: Option<Vec<UsersFilterInput>>,
@@ -420,8 +318,9 @@ pub struct Condition<T: InputType> {
     pub equals: Option<T>,
     pub like: Option<T>,
     pub greater_than: Option<T>,
-    pub less_than: Option<T>, // #[display(fmt = ">", greater_than)]
-                              // greater_than: T
+    pub less_than: Option<T>,
+    #[graphql(name = "in")]
+    pub inside: Option<Vec<T>>,
 }
 
 impl std::fmt::Display for UsersFilterInput {
@@ -433,7 +332,7 @@ impl std::fmt::Display for UsersFilterInput {
             write!(f, " created_at {} AND ", n)?;
         }
         if let Some(n) = &self.id {
-            write!(f, "  id = '{}' AND ", n)?;
+            write!(f, "  id {} AND ", n)?;
         }
 
         match self {
@@ -469,97 +368,19 @@ impl std::fmt::Display for UsersFilterInput {
                     {
                         x = format!(" username {} OR {}", username, x).to_string();
                     }
+                    if let UsersFilterInput {
+                        created_at: Some(created_at),
+                        ..
+                    } = &b
+                    {
+                        x = format!(" created_at {} OR {}", created_at, x).to_string();
+                    }
                     write!(f, "{}", &x)?;
                 }
             }
             _ => write!(f, "")?,
         }
         write!(f, "")
-        // write!(f, "{}", self)
-    }
-
-    // fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    //     println!("{:?}", self);
-    //     match self {
-    //         UsersFilterInput { and: Some(and), .. } => {
-    //             // let x = and
-    //             //     .iter()
-    //             //     .map(|val| self.fmt(f))
-    //             //     .collect::<Vec<String>>()
-    //             //     .join("");
-    //             // write!(f, "blatest {}", x.to_string())
-    //             // self.fmt(f)
-    //             // self.fmt("", f)
-    //             write!(f, "cooltest")
-    //         }
-    //         UsersFilterInput {
-    //             usernameLike: Some(usernameLike),
-    //             ..
-    //         } => write!(f, "username like {}", usernameLike),
-    //         UsersFilterInput {
-    //             idEq: Some(idEq), ..
-    //         } => write!(f, "id = {}", idEq),
-    //         _ => write!(f, "tes"),
-    //     }
-    //     // write!(f, "{:?}", self)
-    //     // match self {
-    //     //     UsersFilterInput { and: Some(and), .. } => write!(f, "bla"),
-    //     //     UsersFilterInput {
-    //     //         usernameLike: Some(usernameLike),
-    //     //         ..
-    //     //     } => write!(f, "WHERE username LIKE '{}'", usernameLike),
-    //     //     _ => write!(f, ""),
-    //     // }
-    // }
-}
-
-#[derive(async_graphql::InputObject)]
-// #[display(fmt = "id")]
-pub struct MyInput {
-    id: Option<Condition<i32>>,
-    username: Option<Condition<String>>,
-}
-
-impl std::fmt::Display for MyInputWithAndOr {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MyInputWithAndOr {
-                and: Some(MyInput { id: Some(id), .. }),
-                ..
-            } => {
-                write!(f, " AND id{}", id)
-            }
-            MyInputWithAndOr {
-                and:
-                    Some(MyInput {
-                        username: Some(username),
-                        ..
-                    }),
-                ..
-            } => {
-                // write!(f, " AND id = {}", equals)
-                write!(f, " AND username{}", username)
-            }
-            MyInputWithAndOr {
-                or: Some(MyInput { id: Some(id), .. }),
-                ..
-            } => {
-                write!(f, " OR id{}", id)
-            }
-            MyInputWithAndOr {
-                or:
-                    Some(MyInput {
-                        username: Some(username),
-                        ..
-                    }),
-                ..
-            } => {
-                // write!(f, " AND id = {}", equals)
-                write!(f, " OR username{}", username)
-            }
-            _ => write!(f, ""),
-        }
-        // write!(f, "{}", self.and)
     }
 }
 
@@ -572,7 +393,7 @@ impl<T: InputType + std::fmt::Display> std::fmt::Display for Condition<T> {
             } => write!(f, " = '{}'", equals),
             Condition {
                 like: Some(like), ..
-            } => write!(f, " like '{}'", like),
+            } => write!(f, " LIKE '{}'", like),
             Condition {
                 greater_than: Some(greater_than),
                 ..
@@ -580,85 +401,23 @@ impl<T: InputType + std::fmt::Display> std::fmt::Display for Condition<T> {
             Condition {
                 less_than: Some(less_than),
                 ..
-            } => write!(f, " less_than '{}'", less_than),
+            } => write!(f, " < '{}'", less_than),
+            Condition {
+                inside: Some(inside),
+                ..
+            } => write!(
+                f,
+                " in ('{}')",
+                inside
+                    .into_iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
             _ => write!(f, ""),
         }
     }
 }
-
-// impl std::fmt::Display for MyInputWithAndOr {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         let mut x = 0;
-//         match &self {
-//             MyInputWithAndOr {
-//                 username: Some(username),
-//                 ..
-//             } => {
-//                 x += 1;
-//                 write!(f, "username {} ", username)
-//             }
-//             MyInputWithAndOr { and: Some(and), .. } => write!(f, "andnnn"),
-//             _ => {
-//                 x += 1;
-//                 println!("{:?}", x);
-//                 write!(f, "")
-//             }
-//         }
-//     }
-// }
-
-// impl<T: InputType + std::fmt::Display> std::fmt::Display for Condition<T> {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         match &self {
-//             Condition {
-//                 equals: Some(equals),
-//                 ..
-//             } => {
-//                 write!(f, "== '{}'", equals)
-//             }
-//             _ => {
-//                 write!(f, "")
-//             }
-//         }
-//         // write!(f, "{}", self.equals)
-//     }
-// }
-
-pub enum Ozy {
-    A,
-}
-
-// async fn query_fn<T>(
-//     table_name: &str,
-//     pool: &PgPool,
-// ) -> Result<Connection<usize, T, ConnectionFields, EmptyFields>> {
-//     let mut rows: Vec<T> = vec![];
-//     let mut has_previous_page = false;
-//     let mut has_next_page = false;
-//
-//     let mut edges = rows
-//         .into_iter()
-//         .enumerate()
-//         .map(|(index, item)| Edge::new(item.id as usize, item))
-//         .collect::<Vec<Edge<usize, T, EmptyFields>>>();
-//
-//     let total_count: (i64,) = sqlx::query_as(&*format!("SELECT COUNT(*) from {}", table_name))
-//         .fetch_one(pool)
-//         .await
-//         .unwrap();
-//
-//     let mut connection = Connection::with_additional_fields(
-//         has_previous_page,
-//         has_next_page,
-//         ConnectionFields {
-//             total_count: total_count.0,
-//         },
-//     );
-//
-//     connection.append(edges);
-//     // Ok::<MyConnection<$entity>, Error>(connection)
-//     Ok(connection)
-// }
 
 #[Object]
 impl QueryRoot {
@@ -742,60 +501,8 @@ impl QueryRoot {
         filter: Option<UsersFilterInput>,
     ) -> Result<UserResult> {
         let pool = context.data::<PgPool>().unwrap();
-        //         let bbb = ormx::conditional_query_as!(
-        //             User,
-        //             r#"SELECT users.id as id, created_at, role_name as "role: Role", username, updated_at
-        // FROM users
-        //          INNER JOIN user_roles ON users.id = user_roles.user_id
-        //          INNER JOIN roles on user_roles.user_id = roles.id
-        //         "# //?(user_id)
-        //         )
-        //         .fetch_all(&*pool)
-        //         .await;
-        //         sqlx::query_as!(
-        //             User,
-        //             r#"select * from ( SELECT users.id as "id!", created_at as "created_at!", role_name as "role!: Role", username as "username!", updated_at as "updated_at!"
-        // FROM users
-        //          INNER JOIN user_roles ON users.id = user_roles.user_id
-        //          INNER JOIN roles on user_roles.user_id = roles.id
-        //         ) as tt"#
-        //         )
-        // println!("{:?}", filter.unwrap().id.unwrap().to_string());
-        // let mut v = vec![];
-        // v.push(Some(StuffAndOr {
-        //     username: Some(Cond {
-        //         eq: "an".to_string(),
-        //     }),
-        //     and: Option::from(Stuff {
-        //         username: Cond {
-        //             eq: "ander".to_string(),
-        //         },
-        //     }),
-        //     or: None,
-        // }));
-        // println!("{:?}", filter.unwrap());
-
-        // let _filter_string = filter
-        //     .unwrap_or_else(|| vec![])
-        //     .iter()
-        //     .map(|x| x.to_string())
-        //     .collect::<Vec<String>>()
-        //     .join("");
-
-        // let xxxx = v
-        //     .iter()
-        //     .map(|x| x.as_ref().unwrap().to_string())
-        //     .collect::<Vec<String>>()
-        //     .join("");
-        // assert_eq!(xxxx, "tn");
-        // assert_eq!(s, "tn");
-
         let _filter_string: String = filter.map(|c| c.to_string()).unwrap_or_default();
         let regex = Regex::new(r"(AND|OR)$")?;
-        // let filter_string = format!(
-        //     "WHERE {}",
-        //     regex.replace(&_filter_string.trim(), "").to_string()
-        // );
         let filter_string = if _filter_string.len() > 0 {
             format!(
                 "WHERE {}",
@@ -804,11 +511,6 @@ impl QueryRoot {
         } else {
             "".to_string()
         };
-
-        // let filter_string = _filter_string.replacen(Regex::new(r"(AND|OR)"), "WHERE ", 1);
-        // println!("{:?}", x.trim());
-        // let filter_string = "WHERE ".to_string() + &filter.unwrap().to_string();
-        // filter_string.push_str("WHERE");
         query_with!(
             User,
             pool,
@@ -826,41 +528,6 @@ impl QueryRoot {
             &order_by.unwrap_or(OrderBy::ASC).to_string(),
             filter_string
         )
-
-        // paginate::<User>(pool).await
-        // Ok(1)
-        // connection::query(
-        //     after,
-        //     before,
-        //     first,
-        //     last,
-        //     |after, before, first, last| async move {
-        //         let mut start = after.map(|after| after + 1).unwrap_or(0);
-        //         let mut end = before.unwrap_or(10000);
-        //         if let Some(first) = first {
-        //             end = (start + first).min(end);
-        //         }
-        //         if let Some(last) = last {
-        //             start = if last > end - start { end } else { end - last };
-        //         }
-        //         let mut connection = Connection::with_additional_fields(
-        //             start > 0,
-        //             end < 10000,
-        //             ConnectionFields { total_count: 10000 },
-        //         );
-        //         connection.append((start..end).map(|n| {
-        //             Edge::with_additional_fields(
-        //                 n,
-        //                 n as i32,
-        //                 Diff {
-        //                     diff: (10000 - n) as i32,
-        //                 },
-        //             )
-        //         }));
-        //         Ok::<_, Error>(connection)
-        //     },
-        // )
-        // .await
     }
     async fn cool(&self, doErr: Option<bool>) -> Result<UserResult> {
         if (doErr.is_some() == true) {
@@ -874,20 +541,6 @@ impl QueryRoot {
 }
 
 pub struct MutationRoot;
-
-#[must_use]
-async fn query_something(pool: &PgPool) {
-    // let x: Result<(), ()> = Err(());
-    // x.is_ok();
-    let x = sqlx::query(r#"ISERT INTO roles (role_name) VALUES('admin')"#)
-        .fetch_one(&*pool)
-        .await;
-}
-
-#[must_use]
-async fn bla(pool: &PgPool) {
-    query_something(pool).await;
-}
 
 #[Object]
 impl MutationRoot {
