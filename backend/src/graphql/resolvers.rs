@@ -157,7 +157,7 @@ macro_rules! query_with {
                 let order_by_text =  if $order_by_column.is_empty() {
                     ""
                 } else {
-                    "ORDER_BY"
+                    "ORDER BY"
                 };
                 rows = sqlx::query_as::<_, $entity>(
                     // &(
