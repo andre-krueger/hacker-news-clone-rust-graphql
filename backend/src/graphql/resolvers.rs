@@ -134,43 +134,15 @@ macro_rules! query_with {
         let total_count: (i64,) = sqlx::query_as(concat!("SELECT COUNT(*) from ", $table_name))
             .fetch_one($pool)
             .await?;
-
-        match ($after, $before, $first, $last) {
-            (None, None, Some(first), None) => {
-                // rows = sqlx::query_as!(
-                //
-                //     $entity,
-                //     "SELECT * from  ("
-                //         + $query
-                //         + " FROM "
-                //         + $table_name
-                //         + $join
-                //         + " ORDER BY "
-                //         + $id_column
-                //         + " ASC LIMIT $1"
-                //         // + r#") as bla order by "username!" ASC"#,
-                //     + ") as _ "
-                //     // + $order_by_column + " " + $order_by ,
-                //     ,
-                //     first
-                // )
                 let order_by_text =  if $order_by_column.is_empty() {
                     ""
                 } else {
                     "ORDER BY"
                 };
+
+        match ($after, $before, $first, $last) {
+            (None, None, Some(first), None) => {
                 rows = sqlx::query_as::<_, $entity>(
-                    // &(
-                    //     "SELECT * FROM (".to_owned()
-                    //     + $query
-                    //       + " FROM "
-                    //     + $table_name
-                    //     + $join
-                    //     + " ORDER BY "
-                    //     + $id_column
-                    //     + " ASC LIMIT $1 ) AS _ ORDER BY  "
-                    //     + $order_by_column + " " + $order_by
-                    // )
                     &*format!("SELECT * FROM ({} FROM {} {} ORDER BY {} ASC LIMIT $1) AS _ {} {} {} {}",
                     $query,
                     $table_name,
@@ -181,19 +153,6 @@ macro_rules! query_with {
                         $order_by_column,
                         $order_by
                     )
-
-
-
-                    // "SELECT * from  (".to_owned()
-                    //     + $query
-                    //     + " FROM "
-                    //     + $table_name
-                    //     + $join
-                    //     + " ORDER BY "
-                    //     + $id_column
-                    //     + " ASC LIMIT $1"
-                    //     // + r#") as bla order by "username!" ASC"#,
-                    // + ") as _ order by " + $order_by_column + " " + $order_by
                 ).bind(first)
                 .fetch_all($pool)
                 .await?;
@@ -201,61 +160,90 @@ macro_rules! query_with {
                 has_previous_page = false;
                 has_next_page = total_count.0 as usize > first as usize;
             }
-            // (None, None, None, Some(last)) => {
-            //     rows = sqlx::query_as!(
-            //         $entity,
-            //         $query
-            //             + " FROM "
-            //             + $table_name
-            //             + $join
-            //             + " ORDER BY "
-            //             + $id_column
-            //             + " DESC LIMIT $1",
-            //         last
-            //     )
-            //     // .bind(1)
-            //     .fetch_all($pool)
-            //     .await
-            //     .unwrap();
-            //     should_reverse = true;
-            //     has_previous_page = total_count.0 as usize > last as usize;
-            //     has_next_page = false
-            // }
-            // (Some(after), None, Some(first), None) => {
-            //     // let _has_previous_page: (bool,) = sqlx::query_as(concat!(
-            //     //     "SELECT COUNT(*) from ",
-            //     //     $table_name,
-            //     //     " where ",
-            //     //     $id_column,
-            //     //     " <= ?"
-            //     // ))
-            //     // .bind(after as u32)
-            //     // .fetch_one(x)
-            //     // .await
-            //     // .unwrap();
-            //     rows = sqlx::query_as!(
-            //         $entity,
-            //         $query
-            //             + " FROM "
-            //             + $table_name
-            //             + $join
-            //             + " where "
-            //             + $id_column
-            //             + " > $1 "
-            //             + "ORDER BY "
-            //             + $id_column
-            //             + " ASC LIMIT $2",
-            //         after.parse::<i32>().unwrap(),
-            //         first,
-            //     )
-            //     .fetch_all($pool)
-            //     .await
-            //     .unwrap();
-            //     should_reverse = false;
-            //     // has_previous_page = total_count.0 as usize > last as usize;
-            //     // has_next_page = false
-            // }
-            // _ =>
+            (None, None, None, Some(last)) => {
+                rows = sqlx::query_as::<_, $entity>(
+                    &*format!("SELECT * FROM ({} FROM {} {} ORDER BY {} DESC LIMIT $1) AS _ {} {} {} {}",
+                    $query,
+                    $table_name,
+                    $join,
+                    $id_column,
+                        $filter,
+                    order_by_text,
+                        $order_by_column,
+                        $order_by
+                    )
+                ).bind(last)
+                .fetch_all($pool)
+                .await?;
+                should_reverse = true;
+                has_previous_page = total_count.0 as usize >last as usize;
+                has_next_page = false;
+            }
+            (Some(after), None,Some(first), None) =>{
+ let _has_previous_page: (i64,) =
+                        sqlx::query_as(
+ &*format!("SELECT COUNT(*) from {} where {} <= $1", $table_name, $id_column)
+ )
+                            // .bind(&after.parse::<i32>().unwrap() )
+ .bind(&after.parse::<i32>()?)
+                            .fetch_one($pool)
+                            .await?;
+                rows = sqlx::query_as::<_, $entity>(
+                    &*format!("SELECT * FROM ({} FROM {} {} WHERE {} > $1 ORDER BY {} ASC LIMIT $2) AS _ {} {} {} {}",
+                    $query,
+                    $table_name,
+                    $join,
+                    $id_column,
+                    $id_column,
+                        $filter,
+                    order_by_text,
+                        $order_by_column,
+                        $order_by
+                    )
+                )
+                // .bind(&after)
+ .bind(&after.parse::<i32>()?)
+                .bind(first)
+                .fetch_all($pool)
+                .await?;
+                should_reverse = false;
+                has_next_page = total_count.0 as usize >first as usize;
+                has_previous_page= _has_previous_page.0 > 0;
+                // has_previous_page = total_count.0 as usize >last as usize;
+                // has_next_page = false;
+            }
+            (None,Some(before),None,Some(last))=>{
+ let _has_next_page: (i64,) =
+                        sqlx::query_as(
+ &*format!("SELECT COUNT(*) from {} where {} >= $1", $table_name, $id_column)
+ )
+                            // .bind(&after.parse::<i32>().unwrap() )
+ .bind(&before.parse::<i32>()?)
+                            .fetch_one($pool)
+                            .await?;
+                has_next_page= _has_next_page.0 > 0;
+                has_previous_page = total_count.0 as usize >last as usize;
+                should_reverse=true;
+
+                rows = sqlx::query_as::<_, $entity>(
+                    &*format!("SELECT * FROM ({} FROM {} {} WHERE {} < $1 ORDER BY {} DESC LIMIT $2) AS _ {} {} {} {}",
+                    $query,
+                    $table_name,
+                    $join,
+                    $id_column,
+                    $id_column,
+                        $filter,
+                    order_by_text,
+                        $order_by_column,
+                        $order_by
+                    )
+                )
+                // .bind(&after)
+ .bind(&before.parse::<i32>()?)
+                .bind(last)
+                .fetch_all($pool)
+                .await?;
+            }
             _ => {
                 return Ok(UserResult::PaginationIncorrect(
                     PaginationIncorrect::default(), // message: "n".to_string(),

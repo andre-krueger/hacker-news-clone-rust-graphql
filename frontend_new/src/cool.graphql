@@ -1,0 +1,20 @@
+query test($first:Int,$last:Int,$before:String,$after:String) {
+  numbers(first: $first, last:$last,before:$before,after:$after) {
+    ... on UserConnection {
+      edges {
+        node {
+          id
+          username
+        }
+      }
+      pageInfo {
+        hasPreviousPage
+        hasNextPage
+      }
+    }
+    ... on PaginationIncorrect {
+      message
+      __typename
+    }
+  }
+}
