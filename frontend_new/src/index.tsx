@@ -19,7 +19,10 @@ const cache = cacheExchange({
 
 const client = createClient({
   url: "http://localhost:8000/graphql",
-
+  fetchOptions: () => {
+    return { credentials: "include" };
+  },
+  //
   exchanges: [dedupExchange, cache, fetchExchange],
   //     exchanges:[
   //         {

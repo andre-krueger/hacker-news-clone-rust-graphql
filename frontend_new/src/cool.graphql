@@ -1,5 +1,6 @@
 query test($first:Int,$last:Int,$before:String,$after:String) {
   numbers(first: $first, last:$last,before:$before,after:$after) {
+    __typename
     ... on UserConnection {
       edges {
         node {
@@ -10,7 +11,10 @@ query test($first:Int,$last:Int,$before:String,$after:String) {
       pageInfo {
         hasPreviousPage
         hasNextPage
+        startCursor
+        endCursor
       }
+      totalCount
     }
     ... on PaginationIncorrect {
       message

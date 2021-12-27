@@ -10,7 +10,7 @@ use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use warp::reply::Response;
-use warp::{http::Response as HttpResponse, Filter};
+use warp::{http::Response as HttpResponse, Filter, header};
 use warp_sessions::{CookieOptions, SameSiteCookieOption, SessionWithStore};
 
 #[tokio::main]
@@ -34,10 +34,12 @@ async fn main() {
                 cookie_name: "sid",
                 secure: false,
                 cookie_value: None,
-                domain: Some("localhost".to_string()),
+                // domain: Some("localhost".to_string()),
+                domain:None,
                 max_age: Some(600),
-                path: Some("/".to_string()),
-                same_site: Some(SameSiteCookieOption::Strict),
+                // path: Some("/".to_string()),
+                path:None,
+                same_site: Some(SameSiteCookieOption::None),
             }),
         ))
         .and_then(
@@ -63,6 +65,8 @@ async fn main() {
             },
         )
         .untuple_one()
+
+        // .header("access-control-allow-credentials", "true")
         .and_then(warp_sessions::reply::with_session);
 
     let graphql_playground = warp::path::end().and(warp::get()).map(|| {
