@@ -1,16 +1,19 @@
- use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
+use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
 use async_graphql::{EmptySubscription, Schema};
 // use async_graphql_warp::Response;
 use async_redis_session::RedisSessionStore;
 use backend::auth::get_role;
-use backend::database::pool::init_pool;
+use backend::database::pool::{init_pool, init_redis_pool};
 use backend::graphql::resolvers::{MutationRoot, QueryRoot};
+use deadpool_redis::{Connection, Pool};
 use dotenv::dotenv;
+use redis::cmd;
 use std::convert::Infallible;
+use std::env;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use warp::reply::Response;
-use warp::{http::Response as HttpResponse, Filter, header};
+use warp::{header, http::Response as HttpResponse, Filter, Rejection};
 use warp_sessions::{CookieOptions, SameSiteCookieOption, SessionWithStore};
 
 #[tokio::main]
@@ -20,8 +23,10 @@ async fn main() {
     pretty_env_logger::init();
 
     let pool = init_pool().await;
+    let mut redis_pool = init_redis_pool().await;
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription).finish();
-    let session_store = RedisSessionStore::new("redis://127.0.0.1:6379/").unwrap();
+    let redis_url = env::var("REDIS_URL").unwrap();
+    let session_store = RedisSessionStore::new(redis_url).unwrap();
 
     let graphql_post = warp::post()
         .and(warp::path("graphql"))
@@ -35,10 +40,10 @@ async fn main() {
                 secure: false,
                 cookie_value: None,
                 // domain: Some("localhost".to_string()),
-                domain:None,
+                domain: None,
                 max_age: Some(600),
                 // path: Some("/".to_string()),
-                path:None,
+                path: None,
                 same_site: Some(SameSiteCookieOption::None),
             }),
         ))
@@ -65,19 +70,107 @@ async fn main() {
             },
         )
         .untuple_one()
-
         // .header("access-control-allow-credentials", "true")
         .and_then(warp_sessions::reply::with_session);
 
-    let graphql_playground = warp::path::end().and(warp::get()).map(|| {
+    let graphql_playground = warp::path("playground").and(warp::get()).map(|| {
         HttpResponse::builder()
             .header("content-type", "text/html")
             .body(playground_source(GraphQLPlaygroundConfig::new("/graphql")))
     });
 
+    let admin_routes = warp::path("admin").map(|| "Admin");
+
+    let backend_routes = admin_routes.or(filters::api(redis_pool));
+
     #[cfg(debug_assertions)]
-    let routes = graphql_playground.or(graphql_post);
+    let routes = graphql_playground.or(graphql_post).or(backend_routes);
     #[cfg(not(debug_assertions))]
-    let routes = graphql_post;
+    let routes = graphql_post.or(backend_routes);
     warp::serve(routes).run(([0, 0, 0, 0], 8000)).await;
+}
+
+mod handlers {
+    use deadpool_redis::Pool;
+    use redis::{cmd, AsyncCommands, Connection};
+    use std::convert::Infallible;
+    use warp::test::request;
+    use warp::{cookie, http, reject, Filter, Rejection};
+
+    pub async fn cards(pool: Pool) -> Result<impl warp::Reply, Infallible> {
+        Ok("cards")
+    }
+
+    pub async fn galleries(pool: Pool) -> Result<impl warp::Reply, Infallible> {
+        Ok("galleries")
+    }
+    pub async fn home(pool: Pool) -> Result<impl warp::Reply, Infallible> {
+        Ok("home")
+    }
+}
+
+fn with_db(pool: Pool) -> impl Filter<Extract = (Connection,), Error = Rejection> + Clone {
+    warp::any().and_then(move || {
+        let pool = pool.clone();
+        async move {
+            match pool.get().await {
+                Ok(db) => Ok(db),
+                Err(_) => Err(warp::reject()),
+            }
+        }
+    })
+}
+
+mod filters {
+    use crate::{handlers, with_db};
+    use deadpool_redis::{Connection, Pool};
+    use redis::AsyncCommands;
+    use sqlx::PgPool;
+    use warp::{cookie, http, Filter, Rejection};
+
+    pub fn api(
+        pool: Pool,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        auth_validation(pool.clone()).untuple_one().and(
+            cards(pool.clone())
+                .or(home(pool.clone()))
+                .or(galleries(pool.clone()))
+                .map(|reply| warp::reply::with_header(reply, "set-cookie", "visited=true")),
+        )
+    }
+
+    fn auth_validation(pool: Pool) -> impl Filter<Extract = ((),), Error = Rejection> + Clone {
+        warp::cookie::optional("visited")
+            .and(with_db(pool))
+            .and_then(move |s: Option<String>, mut db: Connection| async move {
+                if Some(s) != Some(Some("true".to_string())) {
+                    db.incr::<_, _, i32>("hit_count", 1).await.unwrap();
+                }
+                Ok::<_, Rejection>(())
+            })
+    }
+
+    pub fn galleries(
+        pool: Pool,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("galleries")
+            .and(warp::any().map(move || pool.clone()))
+            .and_then(handlers::galleries)
+    }
+
+    pub fn home(
+        pool: Pool,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path::end()
+            .and(warp::any().map(move || pool.clone()))
+            .and_then(handlers::home)
+    }
+
+    pub fn cards(
+        pool: Pool,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!("cards")
+            .and(warp::any().map(move || pool.clone()))
+            .and_then(handlers::cards)
+    }
 }

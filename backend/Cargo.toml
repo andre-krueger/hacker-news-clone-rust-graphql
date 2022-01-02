@@ -36,3 +36,5 @@ derive_more = {version="0.99.17",  default_features=false, features=["display"]}
 regex = "1.5"
 field_types = "*"
 itertools = "0.10.2"
+deadpool-redis = { version = "0.10.1" }
+redis = { version = "0.21" }

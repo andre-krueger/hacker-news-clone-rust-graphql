@@ -61,7 +61,7 @@ impl ErrorExtensions for ResolverError {
 
 #[derive(SimpleObject)]
 pub struct ConnectionFields {
-    total_count: i64,
+    total_count: usize,
 }
 
 #[derive(SimpleObject)]
@@ -76,8 +76,22 @@ struct MyConnection<T: Sync + std::marker::Send + OutputType> {
     page_info: PageInfo,
 }
 
+fn query_fn<T>(pool: &PgPool) -> Result<Connection<usize, T, ConnectionFields, EmptyFields>> {
+    let has_previous_page = false;
+    let has_next_page = false;
+    let mut connection = Connection::with_additional_fields(
+        has_previous_page,
+        has_next_page,
+        ConnectionFields { total_count: 0 },
+    );
+
+    // connection.append(edges);
+    // Ok::<MyConnection<$entity>, Error>(connection)
+    Ok(connection)
+}
+
 macro_rules! query_with {
-    ($entity:ident,$pool:expr, $query:literal, $table_name:literal, $id_column:expr,$after:expr, $before:expr, $first:expr,$last:expr) => {
+    ($entity:ident,$pool:expr, $query:literal, $table_name:literal, $id_column:expr,$after:expr, $before:expr, $first:expr,$last:expr,$skip:expr,$back:expr,$page:expr) => {
         // sqlx::query_as!($entity, "select * from " + $table_name)
         //     .fetch_all($pool)
         //     .await
@@ -92,6 +106,9 @@ macro_rules! query_with {
             $before,
             $first,
             $last,
+            Some(false),
+            false,
+            1,
             "",
             "",
             "",
@@ -118,22 +135,27 @@ macro_rules! query_with {
     //         "ASC",
     //     )
     // };
-    ($entity:ident,$pool:expr, $query:literal,$table_name:literal, $id_column:expr, $after:expr, $before:expr, $first:expr, $last:expr, $join:expr, $order_by_column:expr, $order_by: expr,$filter:expr) => {{
+    ($entity:ident,$pool:expr, $query:literal,$table_name:literal, $id_column:expr, $after:expr, $before:expr, $first:expr, $last:expr,$skip:expr,$back:expr,$page:expr, $join:expr, $order_by_column:expr, $order_by: expr,$filter:expr) => {{
         if let Some(_first) = $first {
             if _first < 0 {
 
-                return Ok(UserResult::PaginationIncorrect(
-                    PaginationIncorrect::default(), // message: "n".to_string(),
-                ));
+                // return Ok(UserResult::PaginationIncorrect(
+                //     PaginationIncorrect::default(), // message: "n".to_string(),
+                // ));
             }
         }
+        let offset = match $skip {
+            Some(v)=> format!(" OFFSET {} ", v),
+            _ => "".to_string()
+        };
+        let mut total_count=0;
         let mut rows = vec![];
         let mut has_previous_page = false;
         let mut has_next_page = false;
         let mut should_reverse = false;
-        let total_count: (i64,) = sqlx::query_as(concat!("SELECT COUNT(*) from ", $table_name))
-            .fetch_one($pool)
-            .await?;
+        // let total_count: (i64,) = sqlx::query_as(&*format!("SELECT COUNT(*) from {} {}", $table_name, $filter))
+        //     .fetch_one($pool)
+        //     .await?;
                 let order_by_text =  if $order_by_column.is_empty() {
                     ""
                 } else {
@@ -143,25 +165,30 @@ macro_rules! query_with {
         match ($after, $before, $first, $last) {
             (None, None, Some(first), None) => {
                 rows = sqlx::query_as::<_, $entity>(
-                    &*format!("SELECT * FROM ({} FROM {} {} ORDER BY {} ASC LIMIT $1) AS _ {} {} {} {}",
+                    &*format!("SELECT * FROM ({} FROM {} {} ORDER BY {} ASC {}) AS _ {} {} {} {} LIMIT $1",
                     $query,
                     $table_name,
                     $join,
                     $id_column,
+                    offset,
                         $filter,
                     order_by_text,
                         $order_by_column,
                         $order_by
                     )
-                ).bind(first)
+                ).bind(first+10*first)
                 .fetch_all($pool)
                 .await?;
+
+ total_count=rows.len();
+ rows = rows[0 .. std::cmp::min(first as usize, total_count)].to_vec();
                 should_reverse = false;
                 has_previous_page = false;
-                has_next_page = total_count.0 as usize > first as usize;
+                // has_next_page = total_count.0 as usize > first as usize;
             }
             (None, None, None, Some(last)) => {
-                rows = sqlx::query_as::<_, $entity>(
+                if ($filter.is_empty()) {
+                    rows = sqlx::query_as::<_, $entity>(
                     &*format!("SELECT * FROM ({} FROM {} {} ORDER BY {} DESC LIMIT $1) AS _ {} {} {} {}",
                     $query,
                     $table_name,
@@ -175,8 +202,25 @@ macro_rules! query_with {
                 ).bind(last)
                 .fetch_all($pool)
                 .await?;
+                }
+                else {
+                rows = sqlx::query_as::<_, $entity>(
+                    &*format!("SELECT * FROM ({} FROM {} {} ORDER BY {} DESC) AS _ {} {} {} {} LIMIT $1",
+                    $query,
+                    $table_name,
+                    $join,
+                    $id_column,
+                        $filter,
+                    order_by_text,
+                        $order_by_column,
+                        $order_by
+                    )
+                ).bind(last)
+                .fetch_all($pool)
+                .await?;
+    }
                 should_reverse = true;
-                has_previous_page = total_count.0 as usize >last as usize;
+                // has_previous_page = total_count.0 as usize >last as usize;
                 has_next_page = false;
             }
             (Some(after), None,Some(first), None) =>{
@@ -188,13 +232,28 @@ macro_rules! query_with {
  .bind(&after.parse::<i32>()?)
                             .fetch_one($pool)
                             .await?;
+let operator = match $back {
+  Some(true) => "<".to_string(),
+     _ => ">".to_string()
+};
+let orderby = match $back {
+  Some(true) => "DESC".to_string(),
+     _ => "ASC".to_string()
+};
+ let bb = match $back{
+     Some(true) => -10*first,
+     _ => 10*first
+ };
                 rows = sqlx::query_as::<_, $entity>(
-                    &*format!("SELECT * FROM ({} FROM {} {} WHERE {} > $1 ORDER BY {} ASC LIMIT $2) AS _ {} {} {} {}",
+                    &*format!("SELECT * FROM ({} FROM {} {} WHERE {} {} $1 ORDER BY {} {} LIMIT $2 {}) AS _ {} {} {} {}",
                     $query,
                     $table_name,
                     $join,
                     $id_column,
+                    operator,
                     $id_column,
+                    orderby,
+                        offset,
                         $filter,
                     order_by_text,
                         $order_by_column,
@@ -203,12 +262,19 @@ macro_rules! query_with {
                 )
                 // .bind(&after)
  .bind(&after.parse::<i32>()?)
-                .bind(first)
+                .bind(first + bb)
                 .fetch_all($pool)
                 .await?;
+ total_count=rows.len();//std::cmp::max(rows.len(), (first + bb) as usize);//rows.len()+(first as usize) ;
+ rows = rows[0 .. std::cmp::min(first as usize, total_count)].to_vec();
                 should_reverse = false;
-                has_next_page = total_count.0 as usize >first as usize;
-                has_previous_page= _has_previous_page.0 > 0;
+ if let Some(bb) =&rows.last() {
+                 // has_next_page = (bb.id as i64) <total_count.0 ;
+ } else {
+     has_next_page=false;
+ }
+                // has_next_page = (*bb  as i64) <total_count.0 ;
+                has_previous_page= _has_previous_page.0 > 0 && !&rows.is_empty();
                 // has_previous_page = total_count.0 as usize >last as usize;
                 // has_next_page = false;
             }
@@ -222,11 +288,11 @@ macro_rules! query_with {
                             .fetch_one($pool)
                             .await?;
                 has_next_page= _has_next_page.0 > 0;
-                has_previous_page = total_count.0 as usize >last as usize;
+                // has_previous_page = total_count.0 as usize >last as usize;
                 should_reverse=true;
 
                 rows = sqlx::query_as::<_, $entity>(
-                    &*format!("SELECT * FROM ({} FROM {} {} WHERE {} < $1 ORDER BY {} DESC LIMIT $2) AS _ {} {} {} {}",
+                    &*format!("SELECT * FROM ({} FROM {} {} WHERE {} < $1 ORDER BY {} DESC) AS _ {} {} {} {} LIMIT $2",
                     $query,
                     $table_name,
                     $join,
@@ -244,10 +310,29 @@ macro_rules! query_with {
                 .fetch_all($pool)
                 .await?;
             }
+            (None,None,None,None) => {
+
+                has_next_page= false;
+                has_previous_page = false;
+                should_reverse=false;
+                rows = sqlx::query_as::<_, $entity>(
+                    &*format!("{} FROM {} {} {} {} {} {}",
+                    $query,
+                    $table_name,
+                    $join,
+                        $filter,
+                    order_by_text,
+                        $order_by_column,
+                        $order_by
+                    )
+                )
+                .fetch_all($pool)
+                .await?;
+            }
             _ => {
-                return Ok(UserResult::PaginationIncorrect(
-                    PaginationIncorrect::default(), // message: "n".to_string(),
-                ));
+                // return Ok(UserResult::PaginationIncorrect(
+                //     PaginationIncorrect::default(), // message: "n".to_string(),
+                // ));
             } // Ok(UserResult::UserNotFound2(UserNotFound2 {
               //     message: "Not Found".to_string(),
               // }))
@@ -270,6 +355,7 @@ macro_rules! query_with {
         //         end_cursor: Some("".to_string()),
         //     },
         // };
+        // let total_count=*&rows.len() as i64;
         if should_reverse {
             edges.reverse();
         }
@@ -277,13 +363,15 @@ macro_rules! query_with {
             has_previous_page,
             has_next_page,
             ConnectionFields {
-                total_count: total_count.0,
+                total_count:total_count,
+                // total_count:std::cmp::min(total_count.0,edges.len() as i64)
             },
         );
 
         connection.append(edges);
         // Ok::<MyConnection<$entity>, Error>(connection)
-        Ok(UserResult::Connection(connection))
+        // Ok(UserResult::Connection(connection))
+        Ok(connection)
     }};
 }
 
@@ -477,6 +565,14 @@ impl QueryRoot {
     //     query_fn::<User>("users", pool).await
     // }
 
+    async fn numbers2(
+        &self,
+        context: &Context<'_>,
+    ) -> Result<Connection<usize, User, ConnectionFields, EmptyFields>> {
+        let pool = context.data::<PgPool>().unwrap();
+        query_fn(pool)
+    }
+
     async fn numbers(
         &self,
         context: &Context<'_>,
@@ -487,7 +583,10 @@ impl QueryRoot {
         order_by_column: Option<UserColumns>,
         order_by: Option<OrderBy>,
         filter: Option<UsersFilterInput>,
-    ) -> Result<UserResult> {
+        skip: Option<i32>,
+        back: Option<bool>,
+        page: Option<i32>,
+    ) -> Result<Connection<usize, User, ConnectionFields, EmptyFields>> {
         let pool = context.data::<PgPool>().unwrap();
         let _filter_string: String = filter.map(|c| c.to_string()).unwrap_or_default();
         let regex = Regex::new(r"(AND|OR)$")?;
@@ -511,6 +610,9 @@ impl QueryRoot {
             before,
             first,
             last,
+            skip,
+            back,
+            page,
             r#" INNER JOIN user_roles ON users.id = user_roles.user_id INNER JOIN roles on user_roles.role_id = roles.id "#,
             &order_by_column.unwrap_or(UserColumns::Id).to_string(),
             &order_by.unwrap_or(OrderBy::ASC).to_string(),
@@ -587,7 +689,7 @@ impl MutationRoot {
 
     #[graphql(guard = "RoleGuard::new(Role::Admin)")]
     async fn upload(&self, ctx: &Context<'_>, file: Upload) -> bool {
-        println!("upload: filename={}", file.value(ctx).unwrap().filename);
+        // println!("upload: filename={}", file.value(ctx).unwrap().filename);
         true
     }
 

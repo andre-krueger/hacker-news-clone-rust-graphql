@@ -1,12 +1,16 @@
-import React, { Dispatch, SetStateAction, useEffect, useState } from "react";
+import React, {
+  Dispatch,
+  SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import {
+  OrderBy,
   TestQuery,
-  useDelMutation,
-  useLoginMutation,
-  UserEdge,
-  UserResult,
+  UsersFilterInput,
   useTestQuery,
 } from "./generated/graphql";
 import { UseQueryState } from "urql";
@@ -15,73 +19,300 @@ import ReactPaginate from "react-paginate";
 let pag = 1;
 
 function Bla({
+  count,
+  setcount,
   numbers,
   setAfter,
+  username,
+  handleChange,
+  page,
+  setpage,
+  setBefore,
+  setfirst,
+  setlast,
+  setskip,
+  skip,
+  after,
+  setback,
+  pagesize,
+  setpagesize,
 }: {
   setAfter: Dispatch<SetStateAction<string | null | undefined>>;
   numbers: UseQueryState<TestQuery, object>;
+  handleChange: any;
+  setcount: any;
+  count: any;
+  username: any;
+  page: any;
+  setskip: any;
+  setpage: any;
+  setBefore: any;
+  setfirst: any;
+  setpagesize: any;
+  pagesize: any;
+  setlast: any;
+  skip: any;
+  after: any;
+  setback: any;
 }) {
+  let _count = numbers.data?.numbers.totalCount ?? 0;
+  const first = useRef(true);
+  useEffect(() => {
+    // if (first.current && _count > 0) {
+    // setcount(count - 1 + _count);
+    if (count !== _count) {
+      console.log("nnnn", count - _count);
+      setcount(Math.min(_count, count + Math.abs(count - _count)));
+    }
+    // first.current = false;
+    // }
+  }, [_count]);
+  const firstrender = useRef(true);
   if (!numbers) {
     return <h1>test</h1>;
   }
-  // if (numbers.data?.numbers.__typename) {
-  switch (numbers.data?.numbers.__typename) {
-    case "PaginationIncorrect": {
-      return <h1>Incorrect pagination</h1>;
-    }
-    case "UserConnection": {
-      let arr = range(1, numbers.data?.numbers.totalCount / pag + 1);
-      console.log(arr);
-      let b = [1, 2, 3];
-      console.log(numbers.data?.numbers);
-      let after = numbers.data?.numbers.pageInfo.startCursor;
-      console.log(after);
-      return (
-        <>
-          {numbers.data?.numbers.edges?.map((b) => (
-            <div key={b?.node.id}>
-              <h3>{b?.node.username}</h3>
-              <h3>{b?.node.id}</h3>
-            </div>
-          ))}
-          <Pagination
-            items={Math.ceil(numbers.data?.numbers.totalCount / pag)}
-            onClick={() => {}}
+  const startCursor = numbers.data?.numbers.pageInfo.startCursor;
+  const endCursor = numbers.data?.numbers.pageInfo.endCursor;
+  return (
+    <>
+      {numbers.data?.numbers.edges?.map((edge) => {
+        return (
+          <div key={edge?.node.id}>
+            <h1>
+              {edge?.node.id}
+              {edge?.node.username}
+            </h1>
+          </div>
+        );
+      })}
+      <ReactPaginate
+        pageCount={Math.ceil(count / pag)}
+        pageRangeDisplayed={1}
+        onPageChange={({ selected }) => {
+          if (page > selected) {
+            // setcount(count - _count);
+            setback(true);
+            setAfter(startCursor);
+          } else {
+            // setcount(count + _count);
+            setback(false);
+            setAfter(endCursor);
+          }
+          const pagdiff = Math.abs(selected - page);
+          if (pagdiff > 1) {
+            setskip((pagdiff - 1) * pag);
+          } else {
+            setskip(0);
+          }
+          setpage(selected);
+        }}
+      />
+      {/*<ReactPaginate*/}
+      {/*  pageCount={Math.ceil(count / pag)}*/}
+      {/*  onPageChange={({ selected }) => {*/}
+      {/*    // const doesSkip = selected - 1 - page > 0;*/}
+      {/*    setpage(selected);*/}
+      {/*    // console.log("page", page, "test", selected - 1, "doeskip", doesSkip);*/}
+      {/*    // if (doesSkip) {*/}
+      {/*    //   const _skip = Math.abs(page - selected + 1) * pag;*/}
+      {/*    //   setskip(_skip);*/}
+      {/*    // } else {*/}
+      {/*    //   setskip(0);*/}
+      {/*    // }*/}
+      {/*    console.log("after", after);*/}
+      {/*    if (page < selected) {*/}
+      {/*      setAfter(endCursor);*/}
+      {/*    } else {*/}
+      {/*      setAfter(`-${startCursor}`);*/}
+      {/*    }*/}
+      {/*    // if (page < selected) {*/}
+      {/*    //   setAfter(endCursor);*/}
+      {/*    // } else {*/}
+      {/*    //   const _doesSkip = page - selected - 1 > 0;*/}
+      {/*    //   const _skip = Math.abs(selected - page + 2) * pag;*/}
+      {/*    //   if (_doesSkip) {*/}
+      {/*    //     setAfter(`-${parseInt(endCursor!, 10)}`);*/}
+      {/*    //     setskip(_skip);*/}
+      {/*    //     // setskip(0);*/}
+      {/*    //     console.log("ohno", (selected - page + 2) * pag);*/}
+      {/*    //   } else {*/}
+      {/*    //     setskip(0);*/}
+      {/*    //     console.log("coontuentdn");*/}
+      {/*    //     setAfter(`-${parseInt(endCursor!, 10)}`);*/}
+      {/*    //     // const _skip = Math.abs(page - selected + 1) * pag;*/}
+      {/*    //     // setskip(_skip);*/}
+      {/*    //   }*/}
+      {/*    // }*/}
+      {/*    // console.log("offset", page - selected);*/}
+      {/*    // // console.log("cool", selected * pag);*/}
+      {/*    // // const b = Math.ceil(parseInt("3", 10) / selected);*/}
+      {/*    // // let t = Math.min(total-1,selected * parseInt(after ?? "0",10))*/}
+      {/*    // // console.log('befort',after,t)*/}
+      {/*    // // t=5*/}
+      {/*    // // if (t === pag) {*/}
+      {/*    // //   t++;*/}
+      {/*    // // }*/}
+      {/*    // // setAfter(`${after}`);*/}
+      {/*    // // if (page <= selected) {*/}
+      {/*    // //   setfirst(pag);*/}
+      {/*    // //   setBefore(undefined);*/}
+      {/*    // //   setlast(undefined);*/}
+      {/*    // //   setAfter(endCursor);*/}
+      {/*    // // } else {*/}
+      {/*    // //   setAfter(undefined);*/}
+      {/*    // //   setfirst(undefined);*/}
+      {/*    // //   setlast(pag);*/}
+      {/*    // //   setBefore(startCursor);*/}
+      {/*    // // }*/}
+      {/*    // // console.log(selected * pag);*/}
+      {/*    //*/}
+      {/*    // if (doesSkip) {*/}
+      {/*    //   setskip(Math.abs(page - selected) * pag);*/}
+      {/*    //   // setskip(selected * pag);*/}
+      {/*    // } else {*/}
+      {/*    //   // console.log("noo");*/}
+      {/*    //   setskip(0);*/}
+      {/*    // }*/}
+      {/*    // if (page <= selected) {*/}
+      {/*    //   // setfirst(pag);*/}
+      {/*    //   // setBefore(undefined);*/}
+      {/*    //   // setlast(undefined);*/}
+      {/*    //   // setAfter(endCursor);*/}
+      {/*    //   if (!doesSkip) {*/}
+      {/*    //     setAfter(endCursor);*/}
+      {/*    //   }*/}
+      {/*    // } else {*/}
+      {/*    //   // console.log("star", startCursor);*/}
+      {/*    //   // setfirst(undefined);*/}
+      {/*    //   // setlast(pag);*/}
+      {/*    //   // setAfter(undefined);*/}
+      {/*    //   // setBefore(startCursor);*/}
+      {/*    //   // setAfter(`${parseInt(startCursor!) - pag * pag}`);*/}
+      {/*    //   // console.log("nnn", Math.abs(page - selected) * pag);*/}
+      {/*    //   // if (skip > 0) {*/}
+      {/*    //   //   console.log("itis");*/}
+      {/*    //   //   // setAfter(undefined);*/}
+      {/*    //   //   // setskip(0);*/}
+      {/*    //   //   console.log((page - selected) * pag);*/}
+      {/*    //   //   setskip(Math.abs(page - selected) * pag);*/}
+      {/*    //   //   setAfter("-2");*/}
+      {/*    //   //   // setAfter(*/}
+      {/*    //   //   //   `${*/}
+      {/*    //   //   //     -(parseInt(startCursor!, 10) - Math.abs(page - selected)) **/}
+      {/*    //   //   //     pag*/}
+      {/*    //   //   //   }`*/}
+      {/*    //   //   // );*/}
+      {/*    //   // }*/}
+      {/*    //   // else {*/}
+      {/*    //   // console.log("itis");*/}
+      {/*    //   setskip(Math.abs(selected) * pag);*/}
+      {/*    //   setAfter(`-${parseInt(startCursor!, 10)}`);*/}
+      {/*    //   // }*/}
+      {/*    // }*/}
+      {/*    // console.log("ubernn", (selected - page) * pag);*/}
+      {/*    // console.log(page, selected);*/}
+      {/*    // console.log("does", doesSkip);*/}
+      {/*    // setskip((selected - page) * pag);*/}
+      {/*    // console.log("ozy", selected, page);*/}
+      {/*    // setAfter(endCursor);*/}
+      {/*    // setAfter(endCursor);*/}
+      {/*    // setAfter(`${Math.min(selected * pag, parseInt(endCursor!, 10))}`);*/}
+      {/*    // setAfter(`${count / pag}`);*/}
+      {/*    // setAfter(`${(selected -1) * count -1}`)*/}
+      {/*  }}*/}
+      {/*  nextLabel={null}*/}
+      {/*  previousLabel={null}*/}
+      {/*/>*/}
+      {/*<Pagination*/}
+      {/*  items={Math.ceil(numbers.data?.numbers.totalCount! / pag)}*/}
+      {/*  onClick={(sel) => {*/}
+      {/*    console.log(sel);*/}
+      {/*    setAfter(`${sel}`);*/}
+      {/*  }}*/}
+      {/*/>*/}
+
+      <form>
+        <label>
+          username
+          <input
+            type={"text"}
+            name={"name"}
+            value={username}
+            onChange={handleChange}
           />
-          {/*{numbers.data?.numbers.pageInfo.hasNextPage && <button>Click</button>}*/}
-          {/*<ReactPaginate*/}
-          {/*  pageCount={Math.ceil(numbers.data?.numbers.totalCount / pag)}*/}
-          {/*  onPageChange={({ selected }) => {*/}
-          {/*    console.log("cool", selected * pag);*/}
-          {/*    // const b = Math.ceil(parseInt("3", 10) / selected);*/}
-          {/*    let t = selected * pag;*/}
-          {/*    if (t === pag) {*/}
-          {/*      t++;*/}
-          {/*    }*/}
-          {/*    setAfter(`${t}`);*/}
-          {/*  }}*/}
-          {/*/>*/}
-        </>
-      );
-      // return numbers.numbers;
-      // return <h1>test</h1>;
-    }
-    // return (
-    //   <>
-    //     {(numbers.data?.numbers as any).edges?.map((b: any) => (
-    //       <div key={b?.node.id}>
-    //         <h3>{b?.node.username}</h3>
-    //         <h3>{b?.node.id}</h3>
-    //       </div>
-    //     ))}
-    //   </>
-    // );
-  }
-  // } else {
-  //   // let x = numbers.data?.numbers as TestQuery;
-  //   // x.numbers
+        </label>
+      </form>
+    </>
+  );
+  // // if (numbers.data?.numbers.__typename) {
+  // switch (numbers.data?.numbers.__typename) {
+  //   case "PaginationIncorrect": {
+  //     return <h1>Incorrect pagination</h1>;
+  //   }
+  //   case "UserConnection": {
+  //     let arr = range(1, numbers.data?.numbers.totalCount / pag + 1);
+  //     console.log(arr);
+  //     let b = [1, 2, 3];
+  //     console.log(numbers.data?.numbers);
+  //     let total=numbers.data?.numbers.totalCount;
+  //     let after = "0"//numbers.data?.numbers.pageInfo.startCursor ?? "5";
+  //     // if (numbers.data?.numbers.pageInfo.hasNextPage){
+  //     //   after=numbers.data.numbers.pageInfo.endCursor as string
+  //     // }
+  //     // if (numbers.data?.numbers.pageInfo.hasPreviousPage){
+  //     //
+  //     //   after=numbers.data.numbers.pageInfo.startCursor as string
+  //     // }
+  //     console.log('oz,',after);
+  //     return (
+  //       <>
+  //         <h1>{numbers.data?.numbers.totalCount}</h1>
+  //         {numbers.data?.numbers.edges?.map((b) => (
+  //           <div key={b?.node.id}>
+  //             <h3>{b?.node.username}</h3>
+  //             <h3>{b?.node.id}</h3>
+  //           </div>
+  //         ))}
+  //         {/*<Pagination*/}
+  //         {/*  items={Math.ceil(numbers.data?.numbers.totalCount / pag)}*/}
+  //         {/*  onClick={() => {}}*/}
+  //         {/*/>*/}
+  //         {/*{numbers.data?.numbers.pageInfo.hasNextPage && <button>Click</button>}*/}
+  //         <ReactPaginate
+  //           pageCount={Math.ceil(numbers.data?.numbers.totalCount / pag)}
+  //           onPageChange={({ selected }) => {
+  //             // console.log("cool", selected * pag);
+  //             // const b = Math.ceil(parseInt("3", 10) / selected);
+  //             // let t = Math.min(total-1,selected * parseInt(after ?? "0",10))
+  //             // console.log('befort',after,t)
+  //             // t=5
+  //             // if (t === pag) {
+  //             //   t++;
+  //             // }
+  //             setAfter(`${after}`);
+  //           }}
+  //         />
+  //       </>
+  //     );
+  //     // return numbers.numbers;
+  //     // return <h1>test</h1>;
+  //   }
+  //   // return (
+  //   //   <>
+  //   //     {(numbers.data?.numbers as any).edges?.map((b: any) => (
+  //   //       <div key={b?.node.id}>
+  //   //         <h3>{b?.node.username}</h3>
+  //   //         <h3>{b?.node.id}</h3>
+  //   //       </div>
+  //   //     ))}
+  //   //   </>
+  //   // );
   // }
-  return null;
+  // // } else {
+  // //   // let x = numbers.data?.numbers as TestQuery;
+  // //   // x.numbers
+  // // }
+  // return null;
   // return null;
 }
 
@@ -102,7 +333,6 @@ function Pagination({
   onClick: (sel: number) => void;
 }) {
   let x = Array.from({ length: items }, (_, i) => i + 1);
-  console.log("bla", x);
   return (
     <ul>
       {x.map((a) => (
@@ -114,14 +344,60 @@ function Pagination({
   );
 }
 
+function isEmpty(obj: any) {
+  return Object.keys(obj).length === 0;
+}
+
 function Cool({
   setAfter,
+  before,
+  setBefore,
   after,
 }: {
+  before: any;
+  setBefore: any;
   after: string | null | undefined;
   setAfter: Dispatch<SetStateAction<string | null | undefined>>;
 }) {
-  const [res, exec] = useTestQuery({ variables: { first: pag, after } });
+  const [first, setfirst] = useState(pag);
+  const [last, setlast] = useState<number | undefined>(undefined);
+  const [page, setpage] = useState(0);
+  const [back, setback] = useState(false);
+  const [pagesize, setpagesize] = useState(0);
+
+  const [skip, setskip] = useState(0);
+  const [username, setusername] = useState("");
+  const [filter, setfilter] = useState<UsersFilterInput>({});
+  const [count, setcount] = useState(1);
+  useEffect(() => {
+    if (username !== "") {
+      // x ={...x, username:{like:username}}
+      setfilter({ ...filter, username: { like: username } });
+      // setfirst(undefined)
+      // setAfter(undefined)
+    } else {
+      // const { username, ..._filter } = filter;
+      delete filter.username;
+      setfilter(filter);
+    }
+    console.log(filter);
+  }, [username]);
+  console.log(first, after);
+  const [res, exec] = useTestQuery({
+    variables: {
+      first: !isEmpty(filter) ? undefined : first,
+      after: !isEmpty(filter) ? undefined : after,
+      before: !isEmpty(filter) ? undefined : before,
+      last: !isEmpty(filter) ? undefined : last,
+      back,
+      filter,
+      skip,
+      page,
+      orderBy: OrderBy.Asc,
+    },
+  });
+  // TODO: save current page in state and check if less, than use before+last, otherwise after+frist
+
   // Math.ceil(numbers.data?.numbers.totalCount / pag)
   return (
     <div>
@@ -131,7 +407,27 @@ function Cool({
       {/*  Refetch*/}
       {/*</button>*/}
 
-      <Bla numbers={res} setAfter={setAfter} />
+      <Bla
+        setback={setback}
+        after={after}
+        numbers={res}
+        setAfter={setAfter}
+        username={username}
+        handleChange={(event: any) => {
+          setusername(event.target.value);
+        }}
+        page={page}
+        setpage={setpage}
+        setBefore={setBefore}
+        setfirst={setfirst}
+        setlast={setlast}
+        setskip={setskip}
+        skip={skip}
+        pagesize={pagesize}
+        setpagesize={setpagesize}
+        count={count}
+        setcount={setcount}
+      />
     </div>
   );
 }
@@ -141,13 +437,14 @@ function App() {
   // res.data?.numbers.__typename==='PaginationIncorrect';
   // res.data;
   // console.log(res);
-  const [after, setAfter] = useState<string | null | undefined>(null);
-  const [res, ex] = useLoginMutation();
-  const [res_, exec] = useDelMutation();
+  const [after, setAfter] = useState<string | null | undefined>(undefined);
+  const [before, setBefore] = useState<string | null | undefined>(undefined);
+  // const [res, ex] = useLoginMutation();
+  // const [res_, exec] = useDelMutation();
   // console.log("cool", ex());
-  useEffect(() => {
-    console.log("aber", res_);
-  }, [res_]);
+  // useEffect(() => {
+  //   console.log("aber", res_);
+  // }, [res_]);
 
   const [pageVariables, setPageVariables] = useState([
     {
@@ -159,22 +456,27 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <button
-          onClick={() => {
-            ex({ username: "admin", password: "admin" });
-          }}
-        >
-          login
-        </button>
-        <button
-          onClick={() => {
-            exec();
-          }}
-        >
-          Del
-        </button>
+        {/*<button*/}
+        {/*  onClick={() => {*/}
+        {/*    ex({ username: "admin", password: "admin" });*/}
+        {/*  }}*/}
+        {/*>*/}
+        {/*  login*/}
+        {/*</button>*/}
+        {/*<button*/}
+        {/*  onClick={() => {*/}
+        {/*    exec();*/}
+        {/*  }}*/}
+        {/*>*/}
+        {/*  Del*/}
+        {/*</button>*/}
         {/*<button onClick={() => exec( )}>Refetch</button>*/}
-        <Cool setAfter={setAfter} after={after} />
+        <Cool
+          setAfter={setAfter}
+          after={after}
+          setBefore={setBefore}
+          before={before}
+        />
         {/*<Bl numbers={res}/>*/}
         <img src={logo} className="App-logo" alt="logo" />
         <p>

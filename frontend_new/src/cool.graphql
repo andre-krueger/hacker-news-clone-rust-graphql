@@ -1,7 +1,6 @@
-query test($first:Int,$last:Int,$before:String,$after:String) {
-  numbers(first: $first, last:$last,before:$before,after:$after) {
+query test($first:Int,$last:Int,$before:String,$after:String,$filter:UsersFilterInput,$orderBy:OrderBy,$skip:Int,$back:Boolean,$page:Int) {
+  numbers(first: $first, last:$last,before:$before,after:$after,filter:$filter,orderBy:$orderBy, skip:$skip,back:$back,page:$page) {
     __typename
-    ... on UserConnection {
       edges {
         node {
           id
@@ -15,10 +14,5 @@ query test($first:Int,$last:Int,$before:String,$after:String) {
         endCursor
       }
       totalCount
-    }
-    ... on PaginationIncorrect {
-      message
-      __typename
-    }
   }
 }

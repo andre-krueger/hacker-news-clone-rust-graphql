@@ -63,7 +63,7 @@ impl Guard for RoleGuard {
     }
 }
 
-#[derive(SimpleObject, sqlx::FromRow)]
+#[derive(SimpleObject, sqlx::FromRow, Clone)]
 #[graphql(complex)]
 pub struct User {
     #[graphql(skip)]
@@ -73,6 +73,22 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
     pub role: Role,
 }
+
+#[derive(SimpleObject)]
+pub struct PageCursor {
+    pub cursor: String,
+    pub page_number: i32,
+    pub is_current: bool,
+}
+
+#[derive(SimpleObject)]
+pub struct PageCursors {
+    pub first: PageCursor,
+    pub around: Vec<PageCursor>,
+    pub last: PageCursor,
+    pub previous: PageCursor,
+}
+
 // macro_rules! choose_fields {
 //     (
 //         $parent:ident,
@@ -94,6 +110,16 @@ pub struct User {
 impl User {
     pub async fn id(&self) -> async_graphql::ID {
         self.id.into()
+    }
+}
+
+trait HasId {
+    fn id(&self) -> i32;
+}
+
+impl HasId for User {
+    fn id(&self) -> i32 {
+        self.id
     }
 }
 
