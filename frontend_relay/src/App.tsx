@@ -1,4 +1,11 @@
-import React, { Suspense, useEffect, useMemo, useState } from "react";
+import React, {
+  MutableRefObject,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import logo from "./logo.svg";
 import "./App.css";
 import graphql from "babel-plugin-relay/macro";
@@ -16,6 +23,9 @@ import appMutationGraphql from "./__generated__/AppMutation.graphql";
 import { blafeedbackLikeMutation } from "./Login";
 import Upload from "./Upload";
 import { useTable, usePagination } from "react-table";
+import { Link } from "react-router-dom";
+import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
+import { ScrollerRef } from "react-virtuoso/dist/hooks/useScrollTop";
 
 const feedbackLikeMutation = graphql`
   mutation AppMutation {
@@ -47,6 +57,19 @@ const appFragment = graphql`
 `;
 
 function Cool({ bla }: { bla: AppFragment$key }) {
+  const virtuoso: MutableRefObject<VirtuosoHandle | null> = useRef(null);
+  useEffect(() => {
+    if (
+      virtuoso.current &&
+      window.history.state
+      // window.history.state.index
+    ) {
+      // console.log(virtuoso.current);
+      // virtuoso.current.scrollToIndex(window.history.state.index);
+      // virtuoso.current?.scrollTo({})
+      // virtuoso.current?.scrollIntoView()
+    }
+  }, []);
   const { data, loadNext, loadPrevious } = usePaginationFragment(
     appFragment,
     bla
@@ -54,47 +77,6 @@ function Cool({ bla }: { bla: AppFragment$key }) {
   const [commit] = useMutation(feedbackLikeMutation);
   const [commit2] = useMutation(blafeedbackLikeMutation);
 
-  const data2 = useMemo(() => [{ col1: "Hello" }, { col1: "Cool" }], []) as any;
-
-  const columns = useMemo(
-    () => [
-      { Header: "Id", accessor: "node.id" },
-      { Header: "USername", accessor: "node.username" },
-    ],
-    []
-  );
-
-  console.log("cool3", data.numbers.edges);
-  const instance = useTable(
-    {
-      columns,
-      data: data.numbers.edges as any,
-      // initialState: { pageSize: 2 },
-      manualPagination: true,
-      pageCount: 5,
-    } as any,
-    usePagination
-  );
-  const {
-    getTableProps,
-
-    getTableBodyProps,
-
-    headerGroups,
-
-    rows,
-
-    prepareRow,
-    pageOptions,
-    page,
-    state: { pageIndex, pageSize },
-    gotoPage,
-    previousPage,
-    nextPage,
-    setPageSize,
-    canPreviousPage,
-    canNextPage,
-  } = instance as any;
   return (
     <>
       {/*<table {...getTableProps()}>*/}
@@ -164,46 +146,18 @@ function Cool({ bla }: { bla: AppFragment$key }) {
       {/*    }*/}
       {/*  </tbody>*/}
       {/*</table>*/}
-      <div>
-        <button onClick={() => previousPage()} disabled={!canPreviousPage}>
-          Previous Page
-        </button>
-        <button
-          onClick={() => {
-            loadNext(1);
-          }}
-          disabled={!canNextPage}
-        >
-          Next Page
-        </button>
-        <div>
-          Page{" "}
-          <em>
-            {pageIndex + 1} of {pageOptions.length}
-          </em>
-        </div>
-        <div>Go to page:</div>
-        <input
-          type="number"
-          defaultValue={pageIndex + 1 || 1}
-          onChange={(e) => {
-            const page = e.target.value ? Number(e.target.value) - 1 : 0;
-            gotoPage(page);
-          }}
-        />
-        {/*<select*/}
-        {/*  value={pageSize}*/}
-        {/*  onChange={(e) => {*/}
-        {/*    setPageSize(Number(e.target.value));*/}
-        {/*  }}*/}
-        {/*>*/}
-        {/*  {pageSizeOptions.map((pageSize) => (*/}
-        {/*    <option key={pageSize} value={pageSize}>*/}
-        {/*      Show {pageSize}*/}
-        {/*    </option>*/}
-        {/*  ))}*/}
-        {/*</select>*/}
-      </div>
+      {/*<select*/}
+      {/*  value={pageSize}*/}
+      {/*  onChange={(e) => {*/}
+      {/*    setPageSize(Number(e.target.value));*/}
+      {/*  }}*/}
+      {/*>*/}
+      {/*  {pageSizeOptions.map((pageSize) => (*/}
+      {/*    <option key={pageSize} value={pageSize}>*/}
+      {/*      Show {pageSize}*/}
+      {/*    </option>*/}
+      {/*  ))}*/}
+      {/*</select>*/}
       <button
         onClick={() => {
           commit({
@@ -234,18 +188,53 @@ function Cool({ bla }: { bla: AppFragment$key }) {
       >
         delete
       </button>
-      {data.numbers.edges?.map((edge) => {
-        return (
-          <div key={edge?.node.id}>
-            <Suspense fallback={"loadin"}>
-              <h1>
-                {edge?.node.id}
-                {edge?.node.username}
-              </h1>
+      <Virtuoso
+        ref={virtuoso}
+        data={data.numbers.edges!}
+        initialTopMostItemIndex={window.history.state.index ?? 0}
+        rangeChanged={(range) => {
+          console.log("rangecha", range);
+          const newstate = {
+            ...window.history.state,
+            index: range.startIndex,
+          };
+          window.history.pushState(newstate, "", null);
+        }}
+        // data={[{ node: { id: "1", username: "" } }]}
+        style={{ height: "200px", width: "100%" }}
+        // overscan={100}
+        // onScroll={(event: React.UIEvent<"div", HTMLDivElement>) => {
+        //   console.log("bla", event.currentTarget.scrollTop);
+        // }}
+        endReached={(index) => {
+          loadNext(1);
+        }}
+        itemContent={(index, user) => {
+          // return <h1>test</h1>;
+          return (
+            <Suspense fallback={"loading"}>
+              <div key={user?.node.id}>
+                <h1>
+                  {user?.node.id}
+                  {user?.node.username}
+                </h1>
+              </div>
             </Suspense>
-          </div>
-        );
-      })}
+          );
+        }}
+      />
+      {/*{data.numbers.edges?.map((edge) => {*/}
+      {/*  return (*/}
+      {/*    <div key={edge?.node.id}>*/}
+      {/*      <Suspense fallback={"loadin"}>*/}
+      {/*        <h1>*/}
+      {/*          {edge?.node.id}*/}
+      {/*          {edge?.node.username}*/}
+      {/*        </h1>*/}
+      {/*      </Suspense>*/}
+      {/*    </div>*/}
+      {/*  );*/}
+      {/*})}*/}
       <button
         onClick={() => {
           loadPrevious(1);
@@ -268,19 +257,19 @@ function isEmpty(obj: any) {
   return Object.keys(obj).length === 0;
 }
 
-const pag = 3;
+const pag = 1;
 function App() {
   const [username, setusername] = useState<string | undefined>("");
 
+  const [before, setbefore] = useState<undefined | string>(undefined);
   const [after, setafter] = useState<undefined | string>(undefined);
-  const [first, setfirst] = useState<undefined | number>(pag);
+  const [last, setlast] = useState<undefined | number>(pag);
+  const [first, setfirst] = useState<undefined | number>(undefined);
   const [filter, setfilter] = useState<UsersFilterInput>({});
 
   useEffect(() => {
-    console.log(username);
     if (username !== "") {
       // x ={...x, username:{like:username}}
-      console.log("first", first, "after", after);
       setfilter({ ...filter, username: { like: username } });
     } else {
       if (filter?.hasOwnProperty("username")) {
@@ -289,7 +278,6 @@ function App() {
       }
       // delete filter?.username;
     }
-    console.log(filter);
   }, [username]);
 
   const query = useLazyLoadQuery<AppQuery>(
@@ -306,10 +294,14 @@ function App() {
     `,
     // { first: 2, after: "1" }
     {
-      first: !isEmpty(filter) ? undefined : first,
-      after: !isEmpty(filter) ? undefined : after,
-      filter,
-    }
+      first: 2,
+      // first: !isEmpty(filter) ? undefined : first,
+      // last: !isEmpty(filter) ? undefined : last,
+      // after: !isEmpty(filter) ? undefined : after,
+      // before: !isEmpty(filter) ? undefined : before,
+      // filter,
+    },
+    { fetchPolicy: "store-or-network" }
   );
 
   return (
@@ -317,6 +309,7 @@ function App() {
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
         <Upload />
+        <Link to={"/test"}>Bla</Link>
         <Suspense fallback={"Loading"}>
           <Cool bla={query} />
         </Suspense>
@@ -333,17 +326,6 @@ function App() {
             />
           </label>
         </form>
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
       </header>
     </div>
   );

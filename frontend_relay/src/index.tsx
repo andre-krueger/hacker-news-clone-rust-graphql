@@ -2,7 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom";
 import "./index.css";
 import App from "./App";
+import Bla from "./Bla";
 import reportWebVitals from "./reportWebVitals";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { RelayEnvironmentProvider } from "react-relay/hooks";
 import RelayEnvironment from "./RelayEnvironment";
@@ -10,7 +12,13 @@ import RelayEnvironment from "./RelayEnvironment";
 ReactDOM.render(
   <React.StrictMode>
     <RelayEnvironmentProvider environment={RelayEnvironment}>
-      <App />
+      <BrowserRouter>
+        <Routes>
+          <Route path={"/"} element={<App />} />
+          <Route path={"/test"} element={<Bla />} />
+          {/*<App />*/}
+        </Routes>
+      </BrowserRouter>
     </RelayEnvironmentProvider>
   </React.StrictMode>,
   document.getElementById("root")
