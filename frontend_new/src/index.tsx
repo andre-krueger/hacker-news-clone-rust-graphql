@@ -15,10 +15,10 @@ import schema from "./generated/schema";
 //   resolvers: { Query: { numbers: relayPagination() } },
 // });
 const cache = cacheExchange({
-  schema,
+  // schema,
   resolvers: {
     Query: {
-      numbers2: relayPagination(),
+      numbers: relayPagination(),
       // numbers2: simplePagination({
       //   limitArgument: "limit",
       //   offsetArgument: "skip",
