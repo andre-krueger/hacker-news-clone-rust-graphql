@@ -2,17 +2,17 @@
 
 use crate::error::{IncorrectLoginCredentials, UserNotFound};
 use crate::graphql::schema::{
-    OrderBy, PaginationIncorrect, Role, RoleGuard, User, UserColumns, UserData, UserNotFound2,
-    UserResult,
+    OrderBy, PaginationIncorrect, PaginationVecString, Role, RoleGuard, User, UserColumns,
+    UserData, UserNotFound2, UserResult,
 };
 use argon2::PasswordHash;
 use argon2::{Argon2, PasswordVerifier};
 use serde::{Deserialize, Serialize};
 // use async_graphql::guard::Guard;
 use async_graphql::{
-    connection, scalar, Context, Error, ErrorExtensionValues, ErrorExtensions, FieldError,
-    FieldResult, Guard, InputType, InputValueError, InputValueResult, Object, OutputType, Result,
-    ResultExt, SimpleObject, Upload, Value, ID,
+    connection, scalar, Context, ErrorExtensionValues, ErrorExtensions, FieldError, FieldResult,
+    Guard, InputType, InputValueError, InputValueResult, Object, OutputType, Result, ResultExt,
+    SimpleObject, Upload, Value, ID,
 };
 use phf::phf_map;
 use sqlx::postgres::PgRow;
@@ -26,7 +26,9 @@ use async_graphql::connection::{query, Connection, Edge, EmptyFields, PageInfo};
 use async_graphql::registry::Registry;
 use core::fmt;
 use std::borrow::Cow;
+use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
+use std::io::Empty;
 use std::num::ParseIntError;
 use thiserror::Error;
 
@@ -59,9 +61,17 @@ impl ErrorExtensions for ResolverError {
     }
 }
 
+#[derive(async_graphql::Union)]
+enum PaginationVecValues {
+    PaginationVecString(PaginationVecString), // String(String),
+                                              // Int(Int)
+}
+
 #[derive(SimpleObject)]
 pub struct ConnectionFields {
     total_count: usize,
+    //  pagination_type: UserColumns,
+    pagination_vec: Vec<String>,
 }
 
 #[derive(SimpleObject)]
@@ -69,26 +79,100 @@ struct Diff {
     diff: i32,
 }
 
-#[derive(SimpleObject)]
-struct MyConnection<T: Sync + std::marker::Send + OutputType> {
-    edges: Vec<Edge<usize, T, EmptyFields>>,
-    totalCount: usize,
-    page_info: PageInfo,
-}
+// #[derive(SimpleObject)]
+// struct MyConnection<T: Sync + std::marker::Send + OutputType> {
+//     edges: Vec<Edge<usize, T, EmptyFields>>,
+//     totalCount: usize,
+//     page_info: PageInfo,
+// }
 
-fn query_fn<T>(pool: &PgPool) -> Result<Connection<usize, T, ConnectionFields, EmptyFields>> {
+async fn query_fn(pool: &PgPool, limit: Option<i32>, skip: Option<i32>) -> ConnectionResult<User> {
     let has_previous_page = false;
-    let has_next_page = false;
+    let mut has_next_page = false;
+    let limitstring = match limit {
+        Some(l) => format!("LIMIT {}", l + 1),
+        _ => "".to_string(),
+    };
+    let offsetstring = match skip {
+        Some(l) => format!("OFFSET {}", l),
+        _ => "".to_string(),
+    };
+    let mut rows: Vec<User> = sqlx::query_as::<_, User>(
+&*format!(        r#"
+SELECT users.id as id, created_at, role_name as role, username, updated_at
+FROM users
+ INNER JOIN user_roles ON users.id = user_roles.user_id INNER JOIN roles on user_roles.role_id = roles.id 
+  {} {}
+    "#, limitstring, offsetstring),
+    )
+    .fetch_all(pool)
+    .await?;
+    if let Some(i) = limit {
+        if (rows.len() > i as usize) {
+            has_next_page = true;
+        }
+    }
+    rows = rows[0..std::cmp::max(rows.len() - 1, 0)].to_vec();
+    // let mut connection = Connection::with_additional_fields(
+    //     has_previous_page,
+    //     has_next_page,
+    //     ConnectionFields {
+    //         total_count: 0,
+    //         pagination_vec: vec![],
+    //     },
+    // );
+
+    // let mut connection: Connection<String, T, ConnectionFields, _> =
+    //     BlaConnection(Connection::with_additional_fields(
+    //         has_previous_page,
+    //         has_next_page,
+    //         ConnectionFields {
+    //             total_count: 0,
+    //             pagination_vec: vec![],
+    //         },
+    //     ));
+
+    let mut edges = rows
+        .into_iter()
+        .enumerate()
+        .map(|(index, item)| Edge::new(item.created_at.to_string(), item))
+        .collect::<Vec<Edge<_, User, EmptyFields>>>();
+    // .collect::<Vec<Edge<_, $entity, EmptyFields>>>();
+
+    let mut pagination_vec: Vec<String> = sqlx::query(r#"
+SELECT created_at
+FROM users
+ INNER JOIN user_roles ON users.id = user_roles.user_id INNER JOIN roles on user_roles.role_id = roles.id 
+    "#)
+        .fetch_all(pool)
+        .await?
+        .iter()
+        .map(|r| {
+            r.get::<chrono::DateTime<chrono::Utc>, _>("created_at")
+                .to_string()
+        })
+        .collect();
+
     let mut connection = Connection::with_additional_fields(
         has_previous_page,
         has_next_page,
-        ConnectionFields { total_count: 0 },
+        ConnectionFields {
+            total_count: edges.len(),
+            pagination_vec,
+        },
     );
-
-    // connection.append(edges);
+    connection.append(edges);
     // Ok::<MyConnection<$entity>, Error>(connection)
     Ok(connection)
 }
+
+#[derive(async_graphql::MergedObject)]
+#[graphql(name = "BlaConnection")]
+struct BlaConnection<T: Send + Sync + OutputType>(
+    Connection<String, T, ConnectionFields, EmptyFields>,
+);
+
+pub type ConnectionResult<T> = Result<Connection<String, T, ConnectionFields, EmptyFields>>;
 
 macro_rules! query_with {
     ($entity:ident,$pool:expr, $query:literal, $table_name:literal, $id_column:expr,$after:expr, $before:expr, $first:expr,$last:expr,$skip:expr,$back:expr,$page:expr) => {
@@ -136,6 +220,13 @@ macro_rules! query_with {
     //     )
     // };
     ($entity:ident,$pool:expr, $query:literal,$table_name:literal, $id_column:expr, $after:expr, $before:expr, $first:expr, $last:expr,$skip:expr,$back:expr,$page:expr, $join:expr, $order_by_column:expr, $order_by: expr,$filter:expr) => {{
+
+
+                // let mut pagination_type =  match $order_by_column {
+                //     Some(order_by_column)=>order_by_column,
+                //     _=>$id_column
+// };
+
         if let Some(_first) = $first {
             if _first < 0 {
 
@@ -148,14 +239,14 @@ macro_rules! query_with {
             Some(v)=> format!(" OFFSET {} ", v),
             _ => "".to_string()
         };
-        let mut total_count=0;
+        // let mut total_count=0;
         let mut rows = vec![];
         let mut has_previous_page = false;
         let mut has_next_page = false;
         let mut should_reverse = false;
-        // let total_count: (i64,) = sqlx::query_as(&*format!("SELECT COUNT(*) from {} {}", $table_name, $filter))
-        //     .fetch_one($pool)
-        //     .await?;
+        let total_count: (i64,) = sqlx::query_as(&*format!("SELECT COUNT(*) from {} {}", $table_name, $filter))
+            .fetch_one($pool)
+            .await?;
                 let order_by_text =  if $order_by_column.is_empty() {
                     ""
                 } else {
@@ -176,12 +267,12 @@ macro_rules! query_with {
                         $order_by_column,
                         $order_by
                     )
-                ).bind(first+10*first)
+                ).bind(first)
                 .fetch_all($pool)
                 .await?;
 
- total_count=rows.len();
- rows = rows[0 .. std::cmp::min(first as usize, total_count)].to_vec();
+ // total_count=rows.len();
+ // rows = rows[0 .. std::cmp::min(first as usize, total_count)].to_vec();
                 should_reverse = false;
                 has_previous_page = false;
                 // has_next_page = total_count.0 as usize > first as usize;
@@ -226,10 +317,10 @@ macro_rules! query_with {
             (Some(after), None,Some(first), None) =>{
  let _has_previous_page: (i64,) =
                         sqlx::query_as(
- &*format!("SELECT COUNT(*) from {} where {} <= $1", $table_name, $id_column)
+ &*format!("SELECT COUNT(*) from {} where {} < $1::timestamp", $table_name, $id_column)
  )
                             // .bind(&after.parse::<i32>().unwrap() )
- .bind(&after.parse::<i32>()?)
+ .bind(&after)
                             .fetch_one($pool)
                             .await?;
 let operator = match $back {
@@ -245,7 +336,7 @@ let orderby = match $back {
      _ => 10*first
  };
                 rows = sqlx::query_as::<_, $entity>(
-                    &*format!("SELECT * FROM ({} FROM {} {} WHERE {} {} $1 ORDER BY {} {} LIMIT $2 {}) AS _ {} {} {} {}",
+                    &*format!("SELECT * FROM ({} FROM {} {} WHERE {} {} $1::timestamp ORDER BY {} {} LIMIT $2 {}) AS _ {} {} {} {}",
                     $query,
                     $table_name,
                     $join,
@@ -261,13 +352,14 @@ let orderby = match $back {
                     )
                 )
                 // .bind(&after)
- .bind(&after.parse::<i32>()?)
-                .bind(first + bb)
+ // .bind(&after.parse::<i32>()?)
+ .bind(after)
+                .bind(first)
                 .fetch_all($pool)
                 .await?;
- total_count=rows.len();//std::cmp::max(rows.len(), (first + bb) as usize);//rows.len()+(first as usize) ;
- rows = rows[0 .. std::cmp::min(first as usize, total_count)].to_vec();
-                should_reverse = false;
+ // total_count=rows.len();//std::cmp::max(rows.len(), (first + bb) as usize);//rows.len()+(first as usize) ;
+ // rows = rows[0 .. std::cmp::min(first as usize, total_count)].to_vec();
+ //                should_reverse = false;
  if let Some(bb) =&rows.last() {
                  // has_next_page = (bb.id as i64) <total_count.0 ;
  } else {
@@ -281,10 +373,10 @@ let orderby = match $back {
             (None,Some(before),None,Some(last))=>{
  let _has_next_page: (i64,) =
                         sqlx::query_as(
- &*format!("SELECT COUNT(*) from {} where {} >= $1", $table_name, $id_column)
+ &*format!("SELECT COUNT(*) from {} where {} >= $1::timestamp", $table_name, $id_column)
  )
                             // .bind(&after.parse::<i32>().unwrap() )
- .bind(&before.parse::<i32>()?)
+ .bind(&before)
                             .fetch_one($pool)
                             .await?;
                 has_next_page= _has_next_page.0 > 0;
@@ -292,7 +384,7 @@ let orderby = match $back {
                 should_reverse=true;
 
                 rows = sqlx::query_as::<_, $entity>(
-                    &*format!("SELECT * FROM ({} FROM {} {} WHERE {} < $1 ORDER BY {} DESC) AS _ {} {} {} {} LIMIT $2",
+                    &*format!("SELECT * FROM ({} FROM {} {} WHERE {} < $1::timestamp ORDER BY {} DESC) AS _ {} {} {} {} LIMIT $2",
                     $query,
                     $table_name,
                     $join,
@@ -305,7 +397,7 @@ let orderby = match $back {
                     )
                 )
                 // .bind(&after)
- .bind(&before.parse::<i32>()?)
+ .bind(before)
                 .bind(last)
                 .fetch_all($pool)
                 .await?;
@@ -341,8 +433,8 @@ let orderby = match $back {
         let mut edges = rows
             .into_iter()
             .enumerate()
-            .map(|(index, item)| Edge::new(item.id as usize, item))
-            .collect::<Vec<Edge<usize, $entity, EmptyFields>>>();
+            .map(|(index, item)| Edge::new(item.created_at.to_string(), item))
+            .collect::<Vec<Edge<_, $entity, EmptyFields>>>();
         // let mut connection = Connection::with_additional_fields(false, false, EmptyFields);
         // let mut connection = Connection::new(false, false);
         // let connection = MyConnection {
@@ -359,11 +451,18 @@ let orderby = match $back {
         if should_reverse {
             edges.reverse();
         }
+        let mut pagination_vec =sqlx::query("select created_at from users").fetch_all($pool).await?.iter().map(|r|r.get::<chrono::DateTime<chrono::Utc>,_>("created_at").to_string()).collect();
+        // pagination_vec.push("test".to_string());
+        // pagination_vec.push( PaginationVecValues::PaginationVecString(PaginationVecString {
+        //     val: "tet".to_string(),
+        // }));
         let mut connection = Connection::with_additional_fields(
             has_previous_page,
             has_next_page,
             ConnectionFields {
-                total_count:total_count,
+                total_count:total_count.0 as usize,
+                // pagination_type,
+                pagination_vec
                 // total_count:std::cmp::min(total_count.0,edges.len() as i64)
             },
         );
@@ -375,6 +474,7 @@ let orderby = match $back {
     }};
 }
 
+// use crate::graphql::schema::UserResult::Connection;
 use regex::Regex;
 
 #[derive(async_graphql::InputObject)]
@@ -557,21 +657,23 @@ impl QueryRoot {
         // };
     }
 
+    async fn numbers2(
+        &self,
+        context: &Context<'_>,
+        limit: Option<i32>,
+        skip: Option<i32>,
+    ) -> ConnectionResult<User> {
+        let pool = context.data::<PgPool>().unwrap();
+        query_fn(pool, limit, skip).await
+    }
+
     // async fn numbers2(
     //     &self,
     //     context: &Context<'_>,
     // ) -> Result<Connection<usize, User, ConnectionFields, EmptyFields>> {
     //     let pool = context.data::<PgPool>().unwrap();
-    //     query_fn::<User>("users", pool).await
+    //     query_fn(pool)
     // }
-
-    async fn numbers2(
-        &self,
-        context: &Context<'_>,
-    ) -> Result<Connection<usize, User, ConnectionFields, EmptyFields>> {
-        let pool = context.data::<PgPool>().unwrap();
-        query_fn(pool)
-    }
 
     async fn numbers(
         &self,
@@ -586,7 +688,9 @@ impl QueryRoot {
         skip: Option<i32>,
         back: Option<bool>,
         page: Option<i32>,
-    ) -> Result<Connection<usize, User, ConnectionFields, EmptyFields>> {
+    ) -> ConnectionResult<User>
+// Result<Connection<String, User, ConnectionFields, EmptyFields>>
+    {
         let pool = context.data::<PgPool>().unwrap();
         let _filter_string: String = filter.map(|c| c.to_string()).unwrap_or_default();
         let regex = Regex::new(r"(AND|OR)$")?;
@@ -605,7 +709,8 @@ impl QueryRoot {
         SELECT users.id as id , created_at ,role_name as role, username , updated_at
                 "#,
             "users",
-            "users.id",
+            // "users.created_at",
+            UserColumns::CreatedAt,
             after,
             before,
             first,
@@ -615,6 +720,7 @@ impl QueryRoot {
             page,
             r#" INNER JOIN user_roles ON users.id = user_roles.user_id INNER JOIN roles on user_roles.role_id = roles.id "#,
             &order_by_column.unwrap_or(UserColumns::Id).to_string(),
+            // order_by_column,
             &order_by.unwrap_or(OrderBy::ASC).to_string(),
             filter_string
         )
@@ -628,6 +734,39 @@ impl QueryRoot {
             Ok(UserResult::UserData(UserData { id: 10 }))
         }
     }
+
+    // async fn numbers(
+    //     &self,
+    //     after: Option<String>,
+    //     before: Option<String>,
+    //     first: Option<i32>,
+    //     last: Option<i32>,
+    // ) -> Result<Connection<String, i32, EmptyFields, EmptyFields>> {
+    //     query::<String, i32, EmptyFields, _, _, _, Infallible>(
+    //         after,
+    //         before,
+    //         first,
+    //         last,
+    //         |after, before, first, last| async move {
+    //             // let mut start = after.map(|after| after + 1).unwrap_or(0);
+    //             // let mut end = before.unwrap_or(10000);
+    //             // if let Some(first) = first {
+    //             //     end = (start + first).min(end);
+    //             // }
+    //             // if let Some(last) = last {
+    //             //     start = if last > end - start { end } else { end - last };
+    //             // }
+    //             let mut connection: Connection<String, i32> = Connection::new(false, false);
+    //             connection.append(
+    //                 (0..1)
+    //                     .into_iter()
+    //                     .map(|n| Edge::new("test".to_string(), n as i32)),
+    //             );
+    //             Ok(connection)
+    //         },
+    //     )
+    //     .await
+    // }
 }
 
 pub struct MutationRoot;

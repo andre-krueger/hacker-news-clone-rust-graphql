@@ -103,6 +103,14 @@ async function fetchGraphQL(
     // });
   }
 
+  // if (variables.hasOwnProperty("after") && variables.after !== "0") {
+  //   await new Promise((res, rej) => {
+  //     setTimeout(() => {
+  //       res(true);
+  //     }, 1500);
+  //   });
+  // }
+
   const response = await fetch("http://localhost:8000/graphql", {
     // ...requestVariables,
     ...requestInit,

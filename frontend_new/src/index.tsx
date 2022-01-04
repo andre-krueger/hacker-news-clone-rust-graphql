@@ -5,7 +5,10 @@ import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import { createClient, dedupExchange, fetchExchange, Provider } from "urql";
 import { cacheExchange } from "@urql/exchange-graphcache";
-import { simplePagination } from "@urql/exchange-graphcache/extras";
+import {
+  simplePagination,
+  relayPagination,
+} from "@urql/exchange-graphcache/extras";
 import schema from "./generated/schema";
 
 // const cache = cacheExchange({
@@ -13,7 +16,16 @@ import schema from "./generated/schema";
 // });
 const cache = cacheExchange({
   schema,
-  resolvers: { Query: { numbers: simplePagination() } },
+  resolvers: {
+    Query: {
+      numbers2: relayPagination(),
+      // numbers2: simplePagination({
+      //   limitArgument: "limit",
+      //   offsetArgument: "skip",
+      //   mergeMode: "after",
+      // }),
+    },
+  },
 });
 
 const client = createClient({

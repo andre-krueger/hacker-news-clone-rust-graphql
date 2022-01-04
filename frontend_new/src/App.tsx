@@ -1,5 +1,6 @@
 import React, {
   Dispatch,
+  MutableRefObject,
   SetStateAction,
   useEffect,
   useRef,
@@ -16,7 +17,12 @@ import {
 import { UseQueryState } from "urql";
 import ReactPaginate from "react-paginate";
 
-let pag = 1;
+import ReactSlider from "react-slider";
+import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
+import { FixedSizeList } from "react-window";
+import InfiniteLoader from "react-window-infinite-loader";
+
+let pag = 2;
 
 function Bla({
   count,
@@ -61,7 +67,6 @@ function Bla({
     // if (first.current && _count > 0) {
     // setcount(count - 1 + _count);
     if (count !== _count) {
-      console.log("nnnn", count - _count);
       setcount(Math.min(_count, count + Math.abs(count - _count)));
     }
     // first.current = false;
@@ -365,7 +370,7 @@ function Cool({
   const [back, setback] = useState(false);
   const [pagesize, setpagesize] = useState(0);
 
-  const [skip, setskip] = useState(0);
+  const [skip, setskip] = useState<number | undefined>(undefined);
   const [username, setusername] = useState("");
   const [filter, setfilter] = useState<UsersFilterInput>({});
   const [count, setcount] = useState(1);
@@ -380,25 +385,85 @@ function Cool({
       delete filter.username;
       setfilter(filter);
     }
-    console.log(filter);
   }, [username]);
-  console.log(first, after);
+
+  const virtuoso: MutableRefObject<VirtuosoHandle | null> = useRef(null);
+  console.log("skip", skip);
   const [res, exec] = useTestQuery({
     variables: {
-      first: !isEmpty(filter) ? undefined : first,
-      after: !isEmpty(filter) ? undefined : after,
-      before: !isEmpty(filter) ? undefined : before,
-      last: !isEmpty(filter) ? undefined : last,
-      back,
-      filter,
-      skip,
-      page,
-      orderBy: OrderBy.Asc,
+      // first: !isEmpty(filter) ? undefined : first,
+      // after: !isEmpty(filter) ? undefined : after,
+      // before: !isEmpty(filter) ? undefined : before,
+      // last: !isEmpty(filter) ? undefined : last,
+      // back,
+      // filter,
+      // skip,
+      // page,
+      // orderBy: OrderBy.Asc,
+      // limit: 5,
+      first,
+      after,
+      // skip,
     },
   });
   // TODO: save current page in state and check if less, than use before+last, otherwise after+frist
+  console.log(res.data);
 
+  // console.log("hasnext", res.data?.numbers2.pageInfo.hasNextPage);
+
+  const _itemCount = res.data?.numbers.pageInfo.hasNextPage
+    ? res.data.numbers.edges?.length! + 1
+    : res.data?.numbers.edges?.length;
+  const itemCount = _itemCount ?? 0;
+
+  const isItemLoaded = (index: number) => {
+    return (
+      !res.data?.numbers.pageInfo.hasNextPage ||
+      index < res.data?.numbers.edges?.length!
+    );
+  };
+
+  const firstmount = useRef(true);
+  useEffect(() => {
+    return () => {
+      firstmount.current = false;
+    };
+  }, []);
+  console.log("isfecth", res.fetching, res.data?.numbers.pageInfo.hasNextPage);
+  console.log(res.data?.numbers.edges);
+  const loadMoreItems = res.fetching
+    ? () => {}
+    : (b: number, t: number) => {
+        // console.log("bbnxxnt", skip, pag);
+        // console.log("cool", res.data?.numbers2.pageInfo.hasNextPage);
+        console.log("cool", b, t);
+        return new Promise((res) => {
+          setskip(skip ?? 0 + 5);
+          res(true);
+        });
+      };
+  // const loadMoreItems = () => {
+  //   console.log("loadmore");
+  //   setskip(5);
+  //   // exec({ requestPolicy: "network-only" });
+  //   // res.data?.numbers2.edges?.push(res.data?.numbers2.edges![1]);
+  // };
   // Math.ceil(numbers.data?.numbers.totalCount / pag)
+
+  console.log("data", res.data);
+
+  return (
+    <>
+      <button onClick={() => setAfter(res.data?.numbers.pageInfo.endCursor)}>
+        next
+      </button>
+      <button onClick={() => setskip(10)}>skip</button>
+      {res.data?.numbers.edges?.map((edge) => {
+        return <h6 key={edge?.node.id}>{edge?.node.username}</h6>;
+      })}
+    </>
+  );
+
   return (
     <div>
       {/*<h1>{first}</h1>*/}
@@ -407,29 +472,167 @@ function Cool({
       {/*  Refetch*/}
       {/*</button>*/}
 
-      <Bla
-        setback={setback}
-        after={after}
-        numbers={res}
-        setAfter={setAfter}
-        username={username}
-        handleChange={(event: any) => {
-          setusername(event.target.value);
-        }}
-        page={page}
-        setpage={setpage}
-        setBefore={setBefore}
-        setfirst={setfirst}
-        setlast={setlast}
-        setskip={setskip}
-        skip={skip}
-        pagesize={pagesize}
-        setpagesize={setpagesize}
-        count={count}
-        setcount={setcount}
-      />
+      {/*<Bla*/}
+      {/*  setback={setback}*/}
+      {/*  after={after}*/}
+      {/*  numbers={res}*/}
+      {/*  setAfter={setAfter}*/}
+      {/*  username={username}*/}
+      {/*  handleChange={(event: any) => {*/}
+      {/*    setusername(event.target.value);*/}
+      {/*  }}*/}
+      {/*  page={page}*/}
+      {/*  setpage={setpage}*/}
+      {/*  setBefore={setBefore}*/}
+      {/*  setfirst={setfirst}*/}
+      {/*  setlast={setlast}*/}
+      {/*  setskip={setskip}*/}
+      {/*  skip={skip}*/}
+      {/*  pagesize={pagesize}*/}
+      {/*  setpagesize={setpagesize}*/}
+      {/*  count={count}*/}
+      {/*  setcount={setcount}*/}
+      {/*/>*/}
+
+      <div style={{ position: "absolute", right: 30, height: 100, width: 100 }}>
+        <ReactSlider
+          className="vertical-slider"
+          thumbClassName="example-thumb"
+          trackClassName="example-track"
+          max={res.data?.numbers.paginationVec.length}
+          // max={res.data?.numbers2.totalCount}
+          // defaultValue={[0, 50, 100]}
+          // ariaLabel={["Lowest thumb", "Middle thumb", "Top thumb"]}
+          renderThumb={(props: any, state: any) => (
+            <div {...props}>
+              {state.valueNow}
+              {/*{res.data.numbers2.paginationVec[state.valueNow]}*/}
+              {/*{data.numbers.edges?[state.valueNow]?.node.username??""}*/}
+            </div>
+          )}
+          orientation="vertical"
+          invert
+          pearling
+          onBeforeChange={() => {}}
+          onAfterChange={(n: any) => {
+            // setskip(n);
+            // if (virtuoso.current) {
+            //   virtuoso.current?.scrollToIndex({ index: n });
+            // }
+            // if (virtuoso.current) {
+            //   console.log(
+            //     "vec",
+            //     data.numbers.paginationVec[Math.max(0, n - 1)]
+            //   );
+            //   // setafter(data.numbers.paginationVec[n]);
+            //   refetch({
+            //     first: 1,
+            //     after: data.numbers.pageInfo.endCursor,
+            //     skip: Math.max(n - 1, 0),
+            //
+            //     // after: data.numbers.paginationVec[Math.max(0, n - 1)],
+            //   });
+            //   // loadNext(1, {
+            //   //   onComplete() {
+            //   //     console.log("oncomplete", n);
+            //   //     virtuoso.current?.scrollToIndex({
+            //   //       index: n,
+            //   //       // align: "start",
+            //   //       // behavior: "auto",
+            //   //     });
+            //   //   },
+            //   // });
+            // }
+          }}
+          // minDistance={10}
+        />
+      </div>
+
+      {/*<div style={{ width: 300, height: "100px", backgroundColor: "blue" }}>*/}
+      {/*  <Virtuoso*/}
+      {/*    ref={virtuoso}*/}
+      {/*    // initialItemCount={data.numbers.paginationVec.length}*/}
+      {/*    // initialItemCount={10}*/}
+      {/*    data={res.data?.numbers2.edges!}*/}
+      {/*    // initialTopMostItemIndex={window.history.state.index ?? 0}*/}
+      {/*    rangeChanged={(range) => {*/}
+      {/*      console.log("rangecha", range);*/}
+      {/*      const newstate = {*/}
+      {/*        ...window.history.state,*/}
+      {/*        index: range.startIndex,*/}
+      {/*      };*/}
+      {/*      window.history.pushState(newstate, "", null);*/}
+      {/*    }}*/}
+      {/*    // data={[{ node: { id: "1", username: "" } }]}*/}
+      {/*    style={{ backgroundColor: "red", height: "100px" }}*/}
+      {/*    // overscan={100}*/}
+      {/*    // onScroll={(event: React.UIEvent<"div", HTMLDivElement>) => {*/}
+      {/*    //   console.log("bla", event.currentTarget.scrollTop);*/}
+      {/*    // }}*/}
+      {/*    atBottomStateChange={(at) => {*/}
+      {/*      if (at) {*/}
+      {/*        console.log("itis");*/}
+      {/*      }*/}
+      {/*    }}*/}
+      {/*    endReached={(index) => {*/}
+      {/*      console.log("endreached", index);*/}
+      {/*      // setskip(pag + 3);*/}
+      {/*      // console.log("cool endreached", index);*/}
+      {/*      // loadNext(1);*/}
+      {/*      // if (index !== 0) {*/}
+      {/*      //   console.log("ccntn", index);*/}
+      {/*      //   refetch({*/}
+      {/*      //     first: 1,*/}
+      {/*      //     after: data.numbers.pageInfo.endCursor,*/}
+      {/*      //   });*/}
+      {/*      // }*/}
+      {/*    }}*/}
+      {/*    itemContent={(index, user) => {*/}
+      {/*      return (*/}
+      {/*        <div key={user?.node.id}>*/}
+      {/*          <h1>*/}
+      {/*            /!*{user?.node.id}*!/*/}
+      {/*            {user?.node.username}*/}
+      {/*          </h1>*/}
+      {/*        </div>*/}
+      {/*      );*/}
+      {/*    }}*/}
+      {/*  />*/}
+      {/*</div>*/}
+      <InfiniteLoader
+        isItemLoaded={isItemLoaded}
+        loadMoreItems={loadMoreItems as any}
+        itemCount={itemCount}
+      >
+        {({ onItemsRendered, ref }) => (
+          <FixedSizeList
+            ref={ref}
+            itemCount={itemCount}
+            onItemsRendered={onItemsRendered}
+            width={200}
+            height={200}
+            itemSize={100}
+          >
+            {(props: any) => {
+              // console.log("bbb", res.fetching);
+              if (!isItemLoaded(props.index)) {
+                return <h1 style={props.style}>Loading</h1>;
+              }
+              return (
+                <h1 style={props.style}>
+                  {res.data?.numbers.edges![props.index]!.node.username}
+                </h1>
+              );
+            }}
+          </FixedSizeList>
+        )}
+      </InfiniteLoader>
     </div>
   );
+}
+
+function B() {
+  return <h1></h1>;
 }
 
 function App() {

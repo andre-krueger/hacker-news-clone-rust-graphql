@@ -34,6 +34,7 @@ pub enum UserColumns {
     Username,
     Role,
     CreatedAt,
+    UpdatedAt,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Display)]
@@ -129,6 +130,11 @@ pub struct UserData {
 }
 
 #[derive(async_graphql::SimpleObject)]
+pub struct PaginationVecString {
+    pub val: String,
+}
+
+#[derive(async_graphql::SimpleObject)]
 pub struct UserNotFound2 {
     pub message: String,
 }
@@ -144,7 +150,7 @@ pub enum UserResult {
     UserNotFound2(UserNotFound2),
     // PaginationIncorrect{"n"},
     PaginationIncorrect(PaginationIncorrect),
-    Connection(Connection<usize, User, ConnectionFields, EmptyFields>),
+    // Connection(Connection<usize, User, ConnectionFields, EmptyFields>),
 }
 
 impl Default for PaginationIncorrect {

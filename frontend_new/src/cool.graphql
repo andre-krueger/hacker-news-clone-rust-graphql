@@ -1,18 +1,22 @@
-query test($first:Int,$last:Int,$before:String,$after:String,$filter:UsersFilterInput,$orderBy:OrderBy,$skip:Int,$back:Boolean,$page:Int) {
-  numbers(first: $first, last:$last,before:$before,after:$after,filter:$filter,orderBy:$orderBy, skip:$skip,back:$back,page:$page) {
+query test($first: Int, $after: String, $skip: Int) {
+  numbers(first: $first, after: $after, skip: $skip) {
     __typename
-      edges {
-        node {
-          id
-          username
-        }
+    edges {
+      __typename
+      node {
+        __typename
+        id
+        username
       }
-      pageInfo {
-        hasPreviousPage
-        hasNextPage
-        startCursor
-        endCursor
-      }
-      totalCount
+    }
+    paginationVec
+    pageInfo {
+      __typename
+      hasPreviousPage
+      hasNextPage
+      startCursor
+      endCursor
+    }
+    totalCount
   }
 }

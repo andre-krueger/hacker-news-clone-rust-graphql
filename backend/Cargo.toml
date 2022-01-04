@@ -11,7 +11,7 @@ path = "src/scripts/create_admin.rs"
 
 [dependencies]
 async-graphql = { version = "3.0.15", features = ["chrono", "chrono-tz"] }
-async-graphql-warp = "3.0.15"
+async-graphql-warp = "3.0.19"
 futures = "0.3.18"
 tokio = { version = "1.14.0", features = ["macros", "rt-multi-thread"] }
 serde = { version = "1.0.131", features = ["derive"] }

@@ -26,6 +26,7 @@ import { useTable, usePagination } from "react-table";
 import { Link } from "react-router-dom";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { ScrollerRef } from "react-virtuoso/dist/hooks/useScrollTop";
+import ReactSlider from "react-slider";
 
 const feedbackLikeMutation = graphql`
   mutation AppMutation {
@@ -44,19 +45,34 @@ const appFragment = graphql`
       before: $before
       last: $last
       filter: $filter
+      skip: $skip
     ) @connection(key: "AppFragment_numbers") {
       totalCount
+      paginationVec
       edges {
         node {
           id
           username
         }
       }
+      pageInfo {
+        endCursor
+      }
     }
   }
 `;
 
-function Cool({ bla }: { bla: AppFragment$key }) {
+function Cool({
+  skip,
+  setskip,
+  bla,
+  setafter,
+}: {
+  skip: any;
+  setskip: any;
+  setafter: any;
+  bla: AppFragment$key;
+}) {
   const virtuoso: MutableRefObject<VirtuosoHandle | null> = useRef(null);
   useEffect(() => {
     if (
@@ -70,10 +86,11 @@ function Cool({ bla }: { bla: AppFragment$key }) {
       // virtuoso.current?.scrollIntoView()
     }
   }, []);
-  const { data, loadNext, loadPrevious } = usePaginationFragment(
+  const { data, loadNext, loadPrevious, refetch } = usePaginationFragment(
     appFragment,
     bla
   );
+  const [timeline, settimeline] = useState(0);
   const [commit] = useMutation(feedbackLikeMutation);
   const [commit2] = useMutation(blafeedbackLikeMutation);
 
@@ -188,12 +205,80 @@ function Cool({ bla }: { bla: AppFragment$key }) {
       >
         delete
       </button>
+      <div style={{ position: "absolute", right: 30, height: 100, width: 100 }}>
+        <ReactSlider
+          className="vertical-slider"
+          // thumbClassName="example-thumb"
+          // trackClassName="example-track"
+          // defaultValue={10}
+          min={1}
+          value={timeline}
+          max={data.numbers.paginationVec.length}
+          // defaultValue={[0, 50, 100]}
+          // ariaLabel={["Lowest thumb", "Middle thumb", "Top thumb"]}
+          renderThumb={(props, state) => (
+            <div {...props}>
+              {state.valueNow}
+              {data.numbers.paginationVec[state.valueNow - 1]}
+              {/*{data.numbers.edges?[state.valueNow]?.node.username??""}*/}
+            </div>
+          )}
+          orientation="vertical"
+          invert
+          pearling={false}
+          onBeforeChange={() => {
+            console.log("bla");
+          }}
+          onAfterChange={(n) => {
+            if (virtuoso.current) {
+              // setafter(data.numbers.paginationVec[n]);
+              // loadNext(10);
+              // refetch({
+              //   first: 1,
+              //   after: data.numbers.pageInfo.endCursor,
+              //   skip: Math.max(n - 1, 0),
+              //
+              //   // after: data.numbers.paginationVec[Math.max(0, n - 1)],
+              // });
+
+              const c = data.numbers.edges?.length;
+              const cc = data.numbers.paginationVec.length;
+              console.log(c, cc);
+              refetch({
+                skip: skip + n,
+                after: data.numbers.paginationVec[5],
+              });
+              // if (c === cc) {
+              //   virtuoso.current?.scrollToIndex({
+              //     index: n - 1,
+              //     // align: "start",
+              //     // behavior: "auto",
+              //   });
+              // } else {
+              //   loadNext(n, {
+              //     onComplete() {
+              //       virtuoso.current?.scrollToIndex({
+              //         index: n - 1,
+              //         // align: "start",
+              //         // behavior: "auto",
+              //       });
+              //     },
+              //   });
+              // }
+            }
+          }}
+          // minDistance={10}
+        />
+      </div>
       <Virtuoso
         ref={virtuoso}
+        // initialItemCount={data.numbers.paginationVec.length}
+        // initialItemCount={10}
         data={data.numbers.edges!}
         initialTopMostItemIndex={window.history.state.index ?? 0}
         rangeChanged={(range) => {
-          console.log("rangecha", range);
+          settimeline(range.startIndex + 1);
+          console.log("test", range);
           const newstate = {
             ...window.history.state,
             index: range.startIndex,
@@ -201,14 +286,44 @@ function Cool({ bla }: { bla: AppFragment$key }) {
           window.history.pushState(newstate, "", null);
         }}
         // data={[{ node: { id: "1", username: "" } }]}
-        style={{ height: "200px", width: "100%" }}
+        style={{ height: "100px", width: "100%" }}
         // overscan={100}
         // onScroll={(event: React.UIEvent<"div", HTMLDivElement>) => {
         //   console.log("bla", event.currentTarget.scrollTop);
         // }}
-        endReached={(index) => {
-          loadNext(1);
-        }}
+        // atTopStateChange={(b) => {
+        //   if (b) {
+        //     console.log("start");
+        //     // loadPrevious(1);
+        //     refetch({
+        //       skip: 0,
+        //       first: undefined,
+        //       after: undefined,
+        //       before: "2023-10-10",
+        //       last: 3,
+        //     });
+        //     // loadPrevious(1);
+        //   }
+        // }}
+        // endReached={(index) => {
+        //   // console.log("cool endreached", index);
+        //   // loadNext(1);
+        //   // if (index !== 0) {
+        //   refetch({
+        //     skip: index,
+        //     first: 3,
+        //     before: undefined,
+        //     last: undefined,
+        //     after: data.numbers.pageInfo.endCursor,
+        //   });
+        //   // refetch({
+        //   //   first: 3,
+        //   //   skip: index > 1 ? 10 : undefined,
+        //   //   // after: data.numbers.pageInfo.endCursor,
+        //   // });
+        //   // }
+        //   loadNext(1);
+        // }}
         itemContent={(index, user) => {
           // return <h1>test</h1>;
           return (
@@ -266,6 +381,7 @@ function App() {
   const [last, setlast] = useState<undefined | number>(pag);
   const [first, setfirst] = useState<undefined | number>(undefined);
   const [filter, setfilter] = useState<UsersFilterInput>({});
+  const [skip, setskip] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (username !== "") {
@@ -288,6 +404,7 @@ function App() {
         $before: String
         $last: Int
         $filter: UsersFilterInput
+        $skip: Int
       ) {
         ...AppFragment
       }
@@ -295,6 +412,8 @@ function App() {
     // { first: 2, after: "1" }
     {
       first: 2,
+      after,
+      skip,
       // first: !isEmpty(filter) ? undefined : first,
       // last: !isEmpty(filter) ? undefined : last,
       // after: !isEmpty(filter) ? undefined : after,
@@ -311,7 +430,7 @@ function App() {
         <Upload />
         <Link to={"/test"}>Bla</Link>
         <Suspense fallback={"Loading"}>
-          <Cool bla={query} />
+          <Cool setafter={setafter} bla={query} skip={skip} setskip={setskip} />
         </Suspense>
         <form>
           <label>
