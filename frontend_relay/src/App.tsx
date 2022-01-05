@@ -1,6 +1,8 @@
 import React, {
+  createRef,
   MutableRefObject,
   Suspense,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -27,6 +29,8 @@ import { Link } from "react-router-dom";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { ScrollerRef } from "react-virtuoso/dist/hooks/useScrollTop";
 import ReactSlider from "react-slider";
+import InfiniteLoader from "react-window-infinite-loader";
+import { FixedSizeList, FixedSizeList as List } from "react-window";
 
 const feedbackLikeMutation = graphql`
   mutation AppMutation {
@@ -57,6 +61,7 @@ const appFragment = graphql`
       }
       pageInfo {
         endCursor
+        hasNextPage
       }
     }
   }
@@ -86,13 +91,124 @@ function Cool({
       // virtuoso.current?.scrollIntoView()
     }
   }, []);
-  const { data, loadNext, loadPrevious, refetch } = usePaginationFragment(
-    appFragment,
-    bla
+  const { data, loadNext, loadPrevious, refetch, isLoadingNext } =
+    usePaginationFragment(appFragment, bla);
+  const [isNextPageLoading, setIsNextPageLoading] = useState(false);
+  const [hasNextPage, setHasNextPage] = useState(
+    data.numbers.pageInfo.hasNextPage
   );
   const [timeline, settimeline] = useState(0);
   const [commit] = useMutation(feedbackLikeMutation);
   const [commit2] = useMutation(blafeedbackLikeMutation);
+  const items = data.numbers.edges ?? [];
+  const itemCount = data.numbers.pageInfo.hasNextPage
+    ? items.length + 1
+    : items.length;
+
+  console.log(isLoadingNext);
+
+  const loadMoreItems =
+    // (false && !isLoadingNext) || isNextPageLoading
+    isLoadingNext
+      ? () => {}
+      : (index: number) => {
+          // setIsNextPageLoading(true);
+          // setTimeout(() => {
+          refetch({ after: data.numbers.pageInfo.endCursor });
+          // loadNext(pag, {
+          //   onComplete() {
+          //     console.log("done");
+          //     setHasNextPage(data.numbers.pageInfo.hasNextPage);
+          //     setIsNextPageLoading(false);
+          //   },
+          // });
+          // }, 1000);
+          // setIsNextPageLoading(true);
+        };
+
+  const isItemLoaded = (index: number) =>
+    !data.numbers.pageInfo.hasNextPage || index < items.length;
+
+  const Item = ({ index, style }: { index: number; style: any }) => {
+    let content;
+    if (!isItemLoaded(index)) {
+      content = "Loading...";
+    } else {
+      content = `${items[index]?.node.id}${items[index]?.node.username}`;
+    }
+
+    return <div style={style}>{content}</div>;
+  };
+
+  const myref: MutableRefObject<FixedSizeList<any> | null> = useRef(null);
+
+  // const setRefs = useCallback(
+  //   (node) => {
+  //     if (typeof ref === "function") {
+  //       ref(node);
+  //     }
+  //     ref.current = node;
+  //   },
+  //   [ref]
+  // );
+
+  useEffect(() => {
+    if (myref.current) {
+      console.log("yeah", window.history.state);
+      if (window.history.state) {
+        console.log("cool", window.history.state.scrollOffset);
+        myref.current?.scrollTo(window.history.state.scrollOffset);
+      }
+    }
+  }, [myref.current]);
+
+  return (
+    <div style={{ backgroundColor: "red", height: 50 }}>
+      <InfiniteLoader
+        isItemLoaded={isItemLoaded}
+        loadMoreItems={loadMoreItems}
+        itemCount={itemCount}
+      >
+        {({ onItemsRendered, ref: innerRef }) => (
+          <List
+            onScroll={({ scrollOffset }) => {
+              if (scrollOffset > 0) {
+                const newstate = {
+                  ...window.history.state,
+                  scrollOffset,
+                };
+                console.log("nnnn", scrollOffset);
+                window.history.pushState(newstate, "", null);
+              }
+            }}
+            // className="List"
+            height={50}
+            itemCount={itemCount}
+            itemSize={30}
+            onItemsRendered={onItemsRendered}
+            // ref={(list) => {
+            ref={(list) => {
+              if (myref) {
+                myref.current = list;
+              }
+              // @ts-ignore
+              innerRef(list);
+            }}
+            //   if (ref) {
+            //     ref.current = list;
+            //   }
+            //   // if (innerRef) {
+            //   //   innerRef(list);
+            //   // }
+            // }}
+            width={300}
+          >
+            {Item}
+          </List>
+        )}
+      </InfiniteLoader>
+    </div>
+  );
 
   return (
     <>
@@ -411,14 +527,13 @@ function App() {
     `,
     // { first: 2, after: "1" }
     {
-      first: 2,
-      after,
-      skip,
-      // first: !isEmpty(filter) ? undefined : first,
+      // first: pag,
+      // skip,
+      first: !isEmpty(filter) ? undefined : pag,
       // last: !isEmpty(filter) ? undefined : last,
-      // after: !isEmpty(filter) ? undefined : after,
+      after: !isEmpty(filter) ? undefined : after,
       // before: !isEmpty(filter) ? undefined : before,
-      // filter,
+      filter,
     },
     { fetchPolicy: "store-or-network" }
   );

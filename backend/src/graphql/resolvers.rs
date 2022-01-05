@@ -267,11 +267,16 @@ macro_rules! query_with {
                         $order_by_column,
                         $order_by
                     )
-                ).bind(first)
+                ).bind(first+1)
                 .fetch_all($pool)
                 .await?;
 
  // total_count=rows.len();
+                println!("{} {}", rows.len(),first);
+                if (rows.len() > (first)  as usize) {
+                    has_next_page=true;
+                rows=rows[0..std::cmp::max(rows.len()-1,0)].to_vec();
+                }
  // rows = rows[0 .. std::cmp::min(first as usize, total_count)].to_vec();
                 should_reverse = false;
                 has_previous_page = false;
@@ -354,9 +359,16 @@ let orderby = match $back {
                 // .bind(&after)
  // .bind(&after.parse::<i32>()?)
  .bind(after)
-                .bind(first)
+                .bind(first+1)
                 .fetch_all($pool)
                 .await?;
+
+
+                if (rows.len() > first as usize) {
+                rows=rows[0..std::cmp::max(rows.len()-1,0)].to_vec();
+                    has_next_page=true;
+                }
+
  // total_count=rows.len();//std::cmp::max(rows.len(), (first + bb) as usize);//rows.len()+(first as usize) ;
  // rows = rows[0 .. std::cmp::min(first as usize, total_count)].to_vec();
  //                should_reverse = false;
