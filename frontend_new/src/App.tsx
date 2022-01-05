@@ -8,9 +8,12 @@ import React, {
 } from "react";
 import logo from "./logo.svg";
 import "./App.css";
+
+import Upload from "./Upload";
 import {
   OrderBy,
   TestQuery,
+  useLoginMutation,
   UsersFilterInput,
   useTestQuery,
 } from "./generated/graphql";
@@ -444,8 +447,13 @@ function Cool({
 
   console.log("isfe", res.fetching);
 
+  const [loginResult, login] = useLoginMutation();
   return (
     <>
+      <Upload />
+      <button onClick={() => login({ username: "andre", password: "andre" })}>
+        login
+      </button>
       <Link to={"/test"}>Bla</Link>
       <div style={{ backgroundColor: "red", height: 50 }}>
         <InfiniteLoader

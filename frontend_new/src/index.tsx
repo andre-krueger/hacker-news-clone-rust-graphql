@@ -12,6 +12,7 @@ import {
   relayPagination,
 } from "@urql/exchange-graphcache/extras";
 import schema from "./generated/schema";
+import { multipartFetchExchange } from "@urql/exchange-multipart-fetch";
 
 // const cache = cacheExchange({
 //   resolvers: { Query: { numbers: relayPagination() } },
@@ -36,7 +37,7 @@ const client = createClient({
     return { credentials: "include" };
   },
   //
-  exchanges: [dedupExchange, cache, fetchExchange],
+  exchanges: [dedupExchange, cache, multipartFetchExchange],
   //     exchanges:[
   //         {
   // input:"",

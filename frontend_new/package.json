@@ -13,6 +13,7 @@
     "@types/react-window": "1.8.5",
     "@types/react-window-infinite-loader": "1.0.5",
     "@urql/exchange-graphcache": "^4.3.6",
+    "@urql/exchange-multipart-fetch": "0.1.14",
     "graphql": "^16.2.0",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
