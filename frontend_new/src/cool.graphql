@@ -1,5 +1,5 @@
-query test($first: Int, $after: String, $skip: Int) {
-  numbers(first: $first, after: $after, skip: $skip) {
+query test($first: Int, $after: String, $filter: UsersFilterInput) {
+  numbers(first: $first, after: $after, filter: $filter) {
     __typename
     edges {
       __typename

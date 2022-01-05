@@ -5,6 +5,8 @@ import App from "./App";
 import reportWebVitals from "./reportWebVitals";
 import { createClient, dedupExchange, fetchExchange, Provider } from "urql";
 import { cacheExchange } from "@urql/exchange-graphcache";
+
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import {
   simplePagination,
   relayPagination,
@@ -43,10 +45,20 @@ const client = createClient({
   //     ]
 });
 
+const Bla = () => {
+  return <h1>bla</h1>;
+};
+
 ReactDOM.render(
   <React.StrictMode>
     <Provider value={client}>
-      <App />
+      <BrowserRouter>
+        <Routes>
+          <Route path={"/"} element={<App />} />
+          <Route path={"/test"} element={<Bla />} />
+          {/*<App />*/}
+        </Routes>
+      </BrowserRouter>
     </Provider>
   </React.StrictMode>,
   document.getElementById("root")
