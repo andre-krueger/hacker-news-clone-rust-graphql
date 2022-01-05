@@ -91,6 +91,7 @@ function Cool({
       // virtuoso.current?.scrollIntoView()
     }
   }, []);
+  console.log(window.history.state);
   const { data, loadNext, loadPrevious, refetch, isLoadingNext } =
     usePaginationFragment(appFragment, bla);
   const [isNextPageLoading, setIsNextPageLoading] = useState(false);
@@ -140,28 +141,6 @@ function Cool({
     return <div style={style}>{content}</div>;
   };
 
-  const myref: MutableRefObject<FixedSizeList<any> | null> = useRef(null);
-
-  // const setRefs = useCallback(
-  //   (node) => {
-  //     if (typeof ref === "function") {
-  //       ref(node);
-  //     }
-  //     ref.current = node;
-  //   },
-  //   [ref]
-  // );
-
-  useEffect(() => {
-    if (myref.current) {
-      console.log("yeah", window.history.state);
-      if (window.history.state) {
-        console.log("cool", window.history.state.scrollOffset);
-        myref.current?.scrollTo(window.history.state.scrollOffset);
-      }
-    }
-  }, [myref.current]);
-
   return (
     <div style={{ backgroundColor: "red", height: 50 }}>
       <InfiniteLoader
@@ -169,38 +148,25 @@ function Cool({
         loadMoreItems={loadMoreItems}
         itemCount={itemCount}
       >
-        {({ onItemsRendered, ref: innerRef }) => (
+        {({ onItemsRendered, ref }) => (
           <List
+            initialScrollOffset={window.history.state.scrollOffset ?? 0}
             onScroll={({ scrollOffset }) => {
-              if (scrollOffset > 0) {
-                const newstate = {
-                  ...window.history.state,
-                  scrollOffset,
-                };
-                console.log("nnnn", scrollOffset);
-                window.history.pushState(newstate, "", null);
-              }
+              // if (scrollOffset > 0) {
+              const newstate = {
+                ...window.history.state,
+                scrollOffset,
+              };
+              console.log("nnnn", scrollOffset);
+              window.history.pushState(newstate, "", null);
+              // }
             }}
             // className="List"
             height={50}
+            ref={ref}
             itemCount={itemCount}
             itemSize={30}
             onItemsRendered={onItemsRendered}
-            // ref={(list) => {
-            ref={(list) => {
-              if (myref) {
-                myref.current = list;
-              }
-              // @ts-ignore
-              innerRef(list);
-            }}
-            //   if (ref) {
-            //     ref.current = list;
-            //   }
-            //   // if (innerRef) {
-            //   //   innerRef(list);
-            //   // }
-            // }}
             width={300}
           >
             {Item}
