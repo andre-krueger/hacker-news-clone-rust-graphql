@@ -142,37 +142,69 @@ function Cool({
   };
 
   return (
-    <div style={{ backgroundColor: "red", height: 50 }}>
-      <InfiniteLoader
-        isItemLoaded={isItemLoaded}
-        loadMoreItems={loadMoreItems}
-        itemCount={itemCount}
+    <div>
+      <button
+        onClick={() => {
+          commit({
+            variables: {},
+            onError() {
+              console.log("ter");
+            },
+            onCompleted() {
+              console.log("compl");
+            },
+          });
+        }}
       >
-        {({ onItemsRendered, ref }) => (
-          <List
-            initialScrollOffset={window.history.state.scrollOffset ?? 0}
-            onScroll={({ scrollOffset }) => {
-              // if (scrollOffset > 0) {
-              const newstate = {
-                ...window.history.state,
-                scrollOffset,
-              };
-              console.log("nnnn", scrollOffset);
-              window.history.pushState(newstate, "", null);
-              // }
-            }}
-            // className="List"
-            height={50}
-            ref={ref}
-            itemCount={itemCount}
-            itemSize={30}
-            onItemsRendered={onItemsRendered}
-            width={300}
-          >
-            {Item}
-          </List>
-        )}
-      </InfiniteLoader>
+        login
+      </button>
+      <button
+        onClick={() => {
+          commit2({
+            variables: {},
+            onCompleted(resp) {
+              console.log("cool", resp);
+            },
+            onError() {
+              console.log("errr");
+            },
+          });
+        }}
+      >
+        delete
+      </button>
+      <div style={{ backgroundColor: "red", height: 50 }}>
+        <InfiniteLoader
+          isItemLoaded={isItemLoaded}
+          loadMoreItems={loadMoreItems}
+          itemCount={itemCount}
+        >
+          {({ onItemsRendered, ref }) => (
+            <List
+              initialScrollOffset={window.history.state.scrollOffset ?? 0}
+              onScroll={({ scrollOffset }) => {
+                // if (scrollOffset > 0) {
+                const newstate = {
+                  ...window.history.state,
+                  scrollOffset,
+                };
+                console.log("nnnn", scrollOffset);
+                window.history.pushState(newstate, "", null);
+                // }
+              }}
+              // className="List"
+              height={50}
+              ref={ref}
+              itemCount={itemCount}
+              itemSize={30}
+              onItemsRendered={onItemsRendered}
+              width={300}
+            >
+              {Item}
+            </List>
+          )}
+        </InfiniteLoader>
+      </div>
     </div>
   );
 
@@ -257,36 +289,6 @@ function Cool({
       {/*    </option>*/}
       {/*  ))}*/}
       {/*</select>*/}
-      <button
-        onClick={() => {
-          commit({
-            variables: {},
-            onError() {
-              console.log("ter");
-            },
-            onCompleted() {
-              console.log("compl");
-            },
-          });
-        }}
-      >
-        login
-      </button>
-      <button
-        onClick={() => {
-          commit2({
-            variables: {},
-            onCompleted(resp) {
-              console.log("cool", resp);
-            },
-            onError() {
-              console.log("errr");
-            },
-          });
-        }}
-      >
-        delete
-      </button>
       <div style={{ position: "absolute", right: 30, height: 100, width: 100 }}>
         <ReactSlider
           className="vertical-slider"

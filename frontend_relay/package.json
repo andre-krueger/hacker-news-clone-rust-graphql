@@ -27,7 +27,7 @@
   },
   "scripts": {
     "start": "npm run relay && react-scripts start",
-    "build": "relay && react-scripts build",
+    "build": "npm run relay && react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "relay": "relay-compiler --language typescript --schema schema.graphql --src ./src/"

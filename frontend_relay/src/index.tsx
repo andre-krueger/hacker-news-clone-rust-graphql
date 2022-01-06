@@ -12,7 +12,7 @@ import RelayEnvironment from "./RelayEnvironment";
 ReactDOM.render(
   <React.StrictMode>
     <RelayEnvironmentProvider environment={RelayEnvironment}>
-      <BrowserRouter>
+      <BrowserRouter basename={"/admin"}>
         <Routes>
           <Route path={"/"} element={<App />} />
           <Route path={"/test"} element={<Bla />} />

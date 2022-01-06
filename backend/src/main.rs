@@ -12,9 +12,22 @@ use std::convert::Infallible;
 use std::env;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use warp::reply::Response;
+use warp::reply::{html, Response};
 use warp::{header, http::Response as HttpResponse, Filter, Rejection};
 use warp_sessions::{CookieOptions, SameSiteCookieOption, SessionWithStore};
+
+pub static MANIFEST: &'static str = include_str!("../../build-admin/asset-manifest.json");
+
+pub mod filters {
+    use crate::MANIFEST;
+    use serde_json::{to_value, Value};
+
+    pub fn load_static(s: &str) -> ::askama::Result<String> {
+        let manifest: Value = serde_json::from_str(MANIFEST).unwrap();
+        let n = manifest.get("files").unwrap().get(s).unwrap().to_string();
+        Ok(n)
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -79,21 +92,32 @@ async fn main() {
             .body(playground_source(GraphQLPlaygroundConfig::new("/graphql")))
     });
 
-    let admin_routes = warp::path("admin").map(|| "Admin");
+    let admin_routes = warp::path("admin").map(|| {
+        let template = AdminIndexTemplate {};
+        let res = template.render().unwrap();
+        Ok(html(res))
+    });
 
-    let backend_routes = admin_routes.or(filters::api(redis_pool));
+    let backend_routes = admin_routes.or(warpfilters::api(redis_pool));
 
     #[cfg(debug_assertions)]
-    let routes = graphql_playground.or(graphql_post).or(backend_routes);
+    let routes = graphql_playground
+        .or(graphql_post)
+        .or(backend_routes)
+        .or(warp::path("static").and(warp::fs::dir("../build-admin/static")))
+        .or(warp::path("static").and(warp::fs::dir("../static")));
     #[cfg(not(debug_assertions))]
     let routes = graphql_post.or(backend_routes);
     warp::serve(routes).run(([0, 0, 0, 0], 8000)).await;
 }
 
 mod handlers {
+    use crate::IndexTemplate;
+    use askama::Template;
     use deadpool_redis::Pool;
     use redis::{cmd, AsyncCommands, Connection};
     use std::convert::Infallible;
+    use warp::reply::html;
     use warp::test::request;
     use warp::{cookie, http, reject, Filter, Rejection};
 
@@ -105,7 +129,10 @@ mod handlers {
         Ok("galleries")
     }
     pub async fn home(pool: Pool) -> Result<impl warp::Reply, Infallible> {
-        Ok("home")
+        let template = IndexTemplate {};
+        let res = template.render().unwrap();
+        // Ok("home")
+        Ok(html(res))
     }
 }
 
@@ -121,7 +148,18 @@ fn with_db(pool: Pool) -> impl Filter<Extract = (Connection,), Error = Rejection
     })
 }
 
-mod filters {
+use askama::Template;
+use serde_json::Value;
+
+#[derive(Template)]
+#[template(path = "index.html")]
+struct IndexTemplate;
+
+#[derive(Template)]
+#[template(path = "admin-index.html")]
+struct AdminIndexTemplate;
+
+mod warpfilters {
     use crate::{handlers, with_db};
     use deadpool_redis::{Connection, Pool};
     use redis::AsyncCommands;
