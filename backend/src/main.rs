@@ -112,7 +112,7 @@ async fn main() {
 }
 
 mod handlers {
-    use crate::IndexTemplate;
+    use crate::{GuestBookQuery, GuestbookTemplate, IndexTemplate};
     use askama::Template;
     use deadpool_redis::Pool;
     use redis::{cmd, AsyncCommands, Connection};
@@ -133,6 +133,29 @@ mod handlers {
         let res = template.render().unwrap();
         // Ok("home")
         Ok(html(res))
+    }
+    pub async fn guestbook(b: GuestBookQuery, pool: Pool) -> Result<impl warp::Reply, Infallible> {
+        println!("{:?}", b.no_js);
+        let mut template: GuestbookTemplate; // = GuestbookTemplate {};
+        match b {
+            GuestBookQuery { no_js: Some(no_js) } => {
+                template = GuestbookTemplate {
+                    entry: Some("test".to_string()),
+                }
+            }
+            _ => template = GuestbookTemplate { entry: None },
+        };
+        let res = template.render().unwrap();
+        Ok(html(res))
+        // match b.as_deref() {
+        //     Some("application/json") => Ok("some"),
+        //     _ => Ok("guestbook"),
+        // }
+        // if Some(b) == "application/json".to_string() {
+        //     Ok("some")
+        // } else {
+        //     Ok("guestbook")
+        // }
     }
 }
 
@@ -159,12 +182,18 @@ struct IndexTemplate;
 #[template(path = "admin-index.html")]
 struct AdminIndexTemplate;
 
+#[derive(Template)]
+#[template(path = "guestbook.html")]
+struct GuestbookTemplate {
+    entry: Option<String>,
+}
+
 mod warpfilters {
-    use crate::{handlers, with_db};
+    use crate::{handlers, with_db, GuestBookQuery};
     use deadpool_redis::{Connection, Pool};
     use redis::AsyncCommands;
     use sqlx::PgPool;
-    use warp::{cookie, http, Filter, Rejection};
+    use warp::{cookie, http, reply, Filter, Rejection};
 
     pub fn api(
         pool: Pool,
@@ -173,6 +202,7 @@ mod warpfilters {
             cards(pool.clone())
                 .or(home(pool.clone()))
                 .or(galleries(pool.clone()))
+                .or(guestbook(pool.clone()))
                 .map(|reply| warp::reply::with_header(reply, "set-cookie", "visited=true")),
         )
     }
@@ -211,4 +241,32 @@ mod warpfilters {
             .and(warp::any().map(move || pool.clone()))
             .and_then(handlers::cards)
     }
+
+    pub fn guestbook(
+        pool: Pool,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        // warp::path!("guestbook").and(
+        //     warp::header::optional("test")
+        //         .and(warp::any().map(move || pool.clone()))
+        //         .and_then(handlers::guestbook),
+        // )
+        // warp::path!("guestbook")
+        warp::query::<GuestBookQuery>()
+            .and(warp::path!("guestbook"))
+            .and(warp::any().map(move || pool.clone()))
+            .and_then(handlers::guestbook)
+        // warp::get()
+        //     .and(warp::header::<String>("test").or(
+        //         warp::path!("guestbook").map(|| ""), // .and(warp::header::optional::<String>("test"))
+        //     ))
+        //     .and(warp::any().map(move || pool.clone()))
+        //     .and_then(handlers::guestbook)
+    }
+}
+
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+pub struct GuestBookQuery {
+    pub no_js: Option<String>,
 }
