@@ -22,3 +22,7 @@ npx parcel build src/templates/index.html src/templates/guestbook.html
 
 
 ./cg_clif/build/cargo-clif watch -c -x "run --bin backend" -w ../frontend_parcel/static -w .
+
+to run nginx, redis and postgres, run this in project root
+DEV=true nixos-shell configuration.nix
+the website is then available under localhost:8080

@@ -105,16 +105,16 @@ async fn main() {
     let routes = graphql_playground
         .or(graphql_post)
         .or(backend_routes)
-        .or(warp::path("static").and(warp::fs::dir("../frontend_parcel/static")))
-        // .or(warp::path("static").and(warp::fs::dir("../build-admin/static")))
-        .or(warp::path("js").and(warp::fs::dir("../frontend_parcel/static/js")));
+        .or(warp::path("static").and(warp::fs::dir("../frontend_parcel/static")));
+    // .or(warp::path("static").and(warp::fs::dir("../build-admin/static")))
+    // .or(warp::path("js").and(warp::fs::dir("../frontend_parcel/static/js")));
     #[cfg(not(debug_assertions))]
     let routes = graphql_post.or(backend_routes);
     warp::serve(routes).run(([0, 0, 0, 0], 8000)).await;
 }
 
 mod handlers {
-    use crate::{GuestBookQuery, GuestbookTemplate, IndexTemplate};
+    use crate::{AdminTemplate, GuestBookQuery, GuestbookTemplate};
     use askama::Template;
     use deadpool_redis::Pool;
     use redis::{cmd, AsyncCommands, Connection};
@@ -131,7 +131,7 @@ mod handlers {
         Ok("galleries")
     }
     pub async fn home(pool: Pool) -> Result<impl warp::Reply, Infallible> {
-        let template = IndexTemplate {};
+        let template = AdminTemplate {};
         let res = template.render().unwrap();
         // Ok("home")
         Ok(html(res))
@@ -167,7 +167,10 @@ fn with_db(pool: Pool) -> impl Filter<Extract = (Connection,), Error = Rejection
         async move {
             match pool.get().await {
                 Ok(db) => Ok(db),
-                Err(_) => Err(warp::reject()),
+                Err(_) => {
+                    println!("rejeentct");
+                    Err(warp::reject())
+                }
             }
         }
     })
@@ -177,8 +180,8 @@ use askama::Template;
 use serde_json::Value;
 
 #[derive(Template)]
-#[template(path = "index.html")]
-struct IndexTemplate;
+#[template(path = "admin.html")]
+struct AdminTemplate;
 
 // #[derive(Template)]
 // #[template(path = "admin-index.html")]
@@ -205,7 +208,13 @@ mod warpfilters {
                 .or(home(pool.clone()))
                 .or(galleries(pool.clone()))
                 .or(guestbook(pool.clone()))
-                .map(|reply| warp::reply::with_header(reply, "set-cookie", "visited=true")),
+                .map(|reply| {
+                    warp::reply::with_header(
+                        reply,
+                        "set-cookie",
+                        "visited=true; Secure; HttpOnly; SameSite=Lax",
+                    )
+                }),
         )
     }
 
