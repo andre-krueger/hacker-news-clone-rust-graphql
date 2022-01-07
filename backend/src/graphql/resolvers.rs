@@ -694,6 +694,8 @@ impl QueryRoot {
         before: Option<String>,
         first: Option<i64>,
         last: Option<i64>,
+        // TODO: Merge order_by_column and order_by
+        // should be: orderBy{column:ASC}
         order_by_column: Option<UserColumns>,
         order_by: Option<OrderBy>,
         filter: Option<UsersFilterInput>,

@@ -1,2 +1,2 @@
 [general]
-dirs=["src/templates"]
+dirs=["../frontend_parcel/static"]

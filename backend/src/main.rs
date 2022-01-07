@@ -93,9 +93,10 @@ async fn main() {
     });
 
     let admin_routes = warp::path("admin").map(|| {
-        let template = AdminIndexTemplate {};
-        let res = template.render().unwrap();
-        Ok(html(res))
+        // let template = AdminIndexTemplate {};
+        // let res = template.render().unwrap();
+        // Ok(html(res))
+        Ok("Admin")
     });
 
     let backend_routes = admin_routes.or(warpfilters::api(redis_pool));
@@ -104,8 +105,9 @@ async fn main() {
     let routes = graphql_playground
         .or(graphql_post)
         .or(backend_routes)
-        .or(warp::path("static").and(warp::fs::dir("../build-admin/static")))
-        .or(warp::path("static").and(warp::fs::dir("../static")));
+        .or(warp::path("static").and(warp::fs::dir("../frontend_parcel/static")))
+        // .or(warp::path("static").and(warp::fs::dir("../build-admin/static")))
+        .or(warp::path("js").and(warp::fs::dir("../frontend_parcel/static/js")));
     #[cfg(not(debug_assertions))]
     let routes = graphql_post.or(backend_routes);
     warp::serve(routes).run(([0, 0, 0, 0], 8000)).await;
@@ -178,9 +180,9 @@ use serde_json::Value;
 #[template(path = "index.html")]
 struct IndexTemplate;
 
-#[derive(Template)]
-#[template(path = "admin-index.html")]
-struct AdminIndexTemplate;
+// #[derive(Template)]
+// #[template(path = "admin-index.html")]
+// struct AdminIndexTemplate;
 
 #[derive(Template)]
 #[template(path = "guestbook.html")]

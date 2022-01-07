@@ -16,3 +16,9 @@ Before running, be sure to reverse both 8000 and 8081 via adb reverse.
 
 ### TODO
 - [ ] Check progress on this ticket https://github.com/supermacro/neverthrow/issues/212
+
+
+npx parcel build src/templates/index.html src/templates/guestbook.html 
+
+
+./cg_clif/build/cargo-clif watch -c -x "run --bin backend" -w ../frontend_parcel/static -w .

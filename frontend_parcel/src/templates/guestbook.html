@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>My Parcel App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    {% if let Some(text) = entry %}{{ text }}
+    <a href="guestbook?no_js&page=1">1</a>
+    <a href="guestbook?no_js&page=2">2</a>
+    {% endif %}
+    <script type="module" src="../Guestbook.tsx"></script>
+  </body>
+</html>
