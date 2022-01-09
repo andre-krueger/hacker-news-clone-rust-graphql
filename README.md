@@ -26,3 +26,14 @@ npx parcel build src/templates/index.html src/templates/guestbook.html
 to run nginx, redis and postgres, run this in project root
 DEV=true nixos-shell configuration.nix
 the website is then available under localhost:8080
+
+
+watchexec -e tsx,html,css npm run parcel:build-unoptimized
+
+install https://addons.mozilla.org/en-US/firefox/addon/live-reload/
+with host url
+https://localhost:8081/*
+with source file urls
+https://localhost:8081/static/*.js
+https://localhost:8081/static/*.*.css
+https://localhost:8081/*

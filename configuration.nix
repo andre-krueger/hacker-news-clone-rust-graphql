@@ -1,5 +1,6 @@
 { lib, pkgs, ... }:
-lib.mkMerge [
+let postcard-backend = pkgs.callPackage ./backend/default.nix { };
+in lib.mkMerge [
   (lib.mkIf (builtins.getEnv "DEV" == "true") {
     services.postgresql.settings = { listen_addresses = pkgs.lib.mkForce "*"; };
     services.redis.bind = "*";
@@ -66,6 +67,9 @@ lib.mkMerge [
       mountNixProfile = false;
       cache = "none";
     };
+  })
+  (lib.mkIf (builtins.getEnv "PROD" == "true") {
+    environment.systemPackages = [ postcard-backend ];
   })
   {
     services.openssh.enable = true;
