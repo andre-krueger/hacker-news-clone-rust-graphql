@@ -1,2 +1,2 @@
 [general]
-dirs=["../frontend_parcel/static"]
+dirs=["static"]

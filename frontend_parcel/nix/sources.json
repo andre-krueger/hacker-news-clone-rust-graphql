@@ -1,0 +1,50 @@
+{
+    "napalm": {
+        "branch": "master",
+        "description": "Support for building npm packages in Nix and lightweight npm registry [maintainer @nmattia]",
+        "homepage": "",
+        "owner": "nmattia",
+        "repo": "napalm",
+        "rev": "b60e529d203284a6680c4adec766ad20d885bab2",
+        "sha256": "1xaqz0l7hf6wqy4wsv92rvp3mgncxl9qgdc0wrd2y6scgjd01z8s",
+        "type": "tarball",
+        "url": "https://github.com/nmattia/napalm/archive/b60e529d203284a6680c4adec766ad20d885bab2.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "niv": {
+        "branch": "master",
+        "description": "Easy dependency management for Nix projects",
+        "homepage": "https://github.com/nmattia/niv",
+        "owner": "nmattia",
+        "repo": "niv",
+        "rev": "5830a4dd348d77e39a0f3c4c762ff2663b602d4c",
+        "sha256": "1d3lsrqvci4qz2hwjrcnd8h5vfkg8aypq3sjd4g3izbc8frwz5sm",
+        "type": "tarball",
+        "url": "https://github.com/nmattia/niv/archive/5830a4dd348d77e39a0f3c4c762ff2663b602d4c.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "nixpkgs": {
+        "branch": "release-20.03",
+        "description": "Nix Packages collection",
+        "homepage": "",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "eb73405ecceb1dc505b7cbbd234f8f94165e2696",
+        "sha256": "06k21wbyhhvq2f1xczszh3c2934p0m02by3l2ixvd6nkwrqklax7",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/eb73405ecceb1dc505b7cbbd234f8f94165e2696.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "npmlock2nix": {
+        "branch": "master",
+        "description": null,
+        "homepage": null,
+        "owner": "nix-community",
+        "repo": "npmlock2nix",
+        "rev": "7417a391e729593b37bb5a75147e4aea7c0a3df9",
+        "sha256": "1g89nmgjwp6xl4wa05cgaybj27hvw15y0346qrn20nc4wx39d3g1",
+        "type": "tarball",
+        "url": "https://github.com/nix-community/npmlock2nix/archive/7417a391e729593b37bb5a75147e4aea7c0a3df9.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    }
+}

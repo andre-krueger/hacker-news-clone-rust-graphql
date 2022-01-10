@@ -16,16 +16,17 @@ use warp::reply::{html, Response};
 use warp::{header, http::Response as HttpResponse, Filter, Rejection};
 use warp_sessions::{CookieOptions, SameSiteCookieOption, SessionWithStore};
 
-pub static MANIFEST: &'static str = include_str!("../../build-admin/asset-manifest.json");
+// pub static MANIFEST: &'static str = include_str!("../../build-admin/asset-manifest.json");
 
 pub mod filters {
-    use crate::MANIFEST;
+    // use crate::MANIFEST;
     use serde_json::{to_value, Value};
 
     pub fn load_static(s: &str) -> ::askama::Result<String> {
-        let manifest: Value = serde_json::from_str(MANIFEST).unwrap();
-        let n = manifest.get("files").unwrap().get(s).unwrap().to_string();
-        Ok(n)
+        // let manifest: Value = serde_json::from_str(MANIFEST).unwrap();
+        // let n = manifest.get("files").unwrap().get(s).unwrap().to_string();
+        // Ok(n)
+        Ok("".to_string())
     }
 }
 
@@ -36,6 +37,8 @@ async fn main() {
     pretty_env_logger::init();
 
     let pool = init_pool().await;
+
+    sqlx::migrate!().run(&pool).await;
     let mut redis_pool = init_redis_pool().await;
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription).finish();
     let redis_url = env::var("REDIS_URL").unwrap();
@@ -105,7 +108,7 @@ async fn main() {
     let routes = graphql_playground
         .or(graphql_post)
         .or(backend_routes)
-        .or(warp::path("static").and(warp::fs::dir("../frontend_parcel/static")));
+        .or(warp::path("static").and(warp::fs::dir("static")));
     // .or(warp::path("static").and(warp::fs::dir("../build-admin/static")))
     // .or(warp::path("js").and(warp::fs::dir("../frontend_parcel/static/js")));
     #[cfg(not(debug_assertions))]

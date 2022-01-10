@@ -3,6 +3,7 @@ use argon2::{
     Argon2,
 };
 use backend::database::pool::init_pool;
+use backend::graphql::schema::User;
 use rand_core::OsRng;
 use std::env;
 
@@ -24,21 +25,24 @@ async fn main() {
         .unwrap()
         .to_string();
 
-    let id = sqlx::query!(
+    let id: (i32,) = sqlx::query_as(
         "INSERT INTO users(username, password) VALUES ($1, $2) RETURNING ID;",
-        username,
-        password_hash
+        // username,
+        // password_hash
     )
+    .bind(username)
+    .bind(password_hash)
     .fetch_one(&pool)
     .await
-    .unwrap()
-    .id;
+    .unwrap();
 
-    sqlx::query!(
+    sqlx::query(
         "INSERT INTO user_roles(user_id, role_id) VALUES ($1, $2)",
-        id,
-        1
+        // id,
+        // 1
     )
+    .bind(id.0)
+    .bind(1)
     .execute(&pool)
     .await
     .unwrap();

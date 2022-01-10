@@ -1,0 +1,161 @@
+{
+  "db": "PostgreSQL",
+  "0d6d24ab3cd634e74e64dd8f687e17bc35c0b8c3028052b11d2d819e5f4bf08a": {
+    "query": "SELECT users.id as id, password, created_at, role_name as \"role: Role\", username, updated_at\nFROM users\n         INNER JOIN user_roles ON users.id = user_roles.user_id\n         INNER JOIN roles on user_roles.user_id = roles.id\nwhere users.username = $1\n",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "password",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "role: Role",
+          "type_info": {
+            "Custom": {
+              "name": "role",
+              "kind": {
+                "Enum": [
+                  "admin",
+                  "user"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 4,
+          "name": "username",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 5,
+          "name": "updated_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "20fd1febe0d2fff68a4e2c9e91bd065385a8a1af01884a5f5580cfa7d57b3f53": {
+    "query": "SELECT users.id as id, created_at, role_name as \"role: Role\", username, updated_at\nFROM users\n         INNER JOIN user_roles ON users.id = user_roles.user_id\n         INNER JOIN roles on user_roles.user_id = roles.id\nwhere users.id = $1\n",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "role: Role",
+          "type_info": {
+            "Custom": {
+              "name": "role",
+              "kind": {
+                "Enum": [
+                  "admin",
+                  "user"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 3,
+          "name": "username",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 4,
+          "name": "updated_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "6d69c4f1d93aacf06bea3393a8507b66a6ced23b551a0173b6093901ebc03e61": {
+    "query": "SELECT *\nfrom users\nWHERE id = $1\n",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "username",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "password",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 4,
+          "name": "updated_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  }
+}

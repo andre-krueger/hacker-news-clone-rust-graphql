@@ -1,7 +1,10 @@
 { lib, pkgs, ... }:
-let postcard-backend = pkgs.callPackage ./backend/default.nix { };
+let
+  nodeDependencies = import ./frontend_parcel/default.nix;
+  backend = import ./backend/postcard.nix;
 in lib.mkMerge [
   (lib.mkIf (builtins.getEnv "DEV" == "true") {
+    networking.hostName = "nixos-dev";
     services.postgresql.settings = { listen_addresses = pkgs.lib.mkForce "*"; };
     services.redis.bind = "*";
     services.postgresql.authentication = lib.mkForce ''
@@ -69,7 +72,72 @@ in lib.mkMerge [
     };
   })
   (lib.mkIf (builtins.getEnv "PROD" == "true") {
-    environment.systemPackages = [ postcard-backend ];
+    environment.systemPackages =
+      # [ lib.packages.${pkgs.system}.postcard-backend ];
+      [ backend pkgs.sqlx-cli ];
+    nixos-shell.mounts = {
+      mountHome = false;
+      mountNixProfile = false;
+      cache = "none";
+    };
+
+    virtualisation.forwardPorts = [
+      {
+        from = "host";
+        host.port = 8080;
+        guest.port = 80;
+      }
+      {
+        from = "host";
+        host.port = 6379;
+        guest.port = 6379;
+      }
+      {
+        from = "host";
+        host.port = 5432;
+        guest.port = 5432;
+      }
+      {
+        from = "host";
+        host.port = 8081;
+        guest.port = 443;
+      }
+    ];
+
+    services.postgresql.authentication = lib.mkForce ''
+      local all all trust
+            host all             all              0.0.0.0/0                       trust
+            host  all             all              ::/0                            trust'';
+
+    systemd.services.backend = {
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network.target" ];
+      description = "Start the irc client of username.";
+      serviceConfig = {
+        # Type = "forking";
+        # User = "username";
+        # ExecStart = ''${pkgs.screen}/bin/screen -dmS irc ${pkgs.irssi}/bin/irssi'';
+        EnvironmentFile = "${backend}/bin/.env";
+        ExecStart = "${backend}/bin/backend";
+        # ExecStop = ''${pkgs.screen}/bin/screen -S irc -X quit'';
+      };
+    };
+
+    services.nginx = {
+      enable = true;
+      recommendedProxySettings = true;
+      recommendedTlsSettings = true;
+      virtualHosts."localhost" = {
+        forceSSL = true;
+        sslCertificate =
+          "${pkgs.path}/nixos/tests/common/acme/server/acme.test.cert.pem";
+        sslCertificateKey =
+          "${pkgs.path}/nixos/tests/common/acme/server/acme.test.key.pem";
+        locations."/".proxyPass = "http://localhost:8000";
+        locations."/static/".alias = "${backend}/static/";
+      };
+
+    };
   })
   {
     services.openssh.enable = true;
