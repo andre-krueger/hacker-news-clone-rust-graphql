@@ -5,7 +5,8 @@ import "./index.css";
 import Bla from "./Bla";
 import reportWebVitals from "./reportWebVitals";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { Router, ReactLocation, useMatch } from "react-location";
+import { Router, ReactLocation, useMatch, Link } from "react-location";
+import { parseSearch, stringifySearch } from "react-location-jsurl";
 
 import {
   loadQuery,
@@ -73,6 +74,14 @@ function About() {
 
 const routes = [
   {
+    path: "/",
+    element: (
+      <Link preload={500} to={"/about"}>
+        about
+      </Link>
+    ),
+  },
+  {
     path: "about",
     loader: () => ({
       // bla: await fetch("http://localhost:3000"),
@@ -103,11 +112,15 @@ const routes = [
     ),
   },
 ];
-const location = new ReactLocation();
+const location = new ReactLocation({ parseSearch, stringifySearch });
 ReactDOM.render(
   <React.StrictMode>
     <RelayEnvironmentProvider environment={RelayEnvironment}>
-      <Router location={location} routes={routes}></Router>
+      <Router
+        // defaultLinkPreloadMaxAge={500}
+        location={location}
+        routes={routes}
+      ></Router>
     </RelayEnvironmentProvider>
   </React.StrictMode>,
   document.getElementById("root")
