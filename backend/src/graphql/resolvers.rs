@@ -17,7 +17,7 @@ use async_graphql::{
 use phf::phf_map;
 use sqlx::postgres::PgRow;
 use sqlx::{FromRow, PgPool, Postgres, Row};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{RwLock, RwLockWriteGuard};
 use warp_sessions::Session;
@@ -489,55 +489,71 @@ let orderby = match $back {
 // use crate::graphql::schema::UserResult::Connection;
 use regex::Regex;
 
-#[derive(async_graphql::InputObject)]
+#[derive(async_graphql::InputObject, Serialize, Deserialize)]
 pub struct UsersFilterInput {
-    pub not: Box<Option<UsersFilterInput>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub not: Option<Vec<UsersFilterInput>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub and: Option<Vec<UsersFilterInput>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub or: Option<Vec<UsersFilterInput>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub username: Option<Condition<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<Condition<i32>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub created_at: Option<Condition<String>>,
 }
 
-#[derive(async_graphql::InputObject)]
+#[derive(async_graphql::InputObject, Serialize, Deserialize)]
 #[graphql(concrete(name = "IntegerCondition", params(i32)))]
 #[graphql(concrete(name = "StringCondition", params(String)))]
 pub struct Condition<T: InputType> {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub equals: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub like: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub greater_than: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub less_than: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[graphql(name = "in")]
     pub inside: Option<Vec<T>>,
 }
 
 impl std::fmt::Display for UsersFilterInput {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut or = false;
         if let Some(n) = &self.username {
-            write!(f, "username {} AND ", n)?;
+            write!(f, " username {} AND ", n)?;
         }
         if let Some(n) = &self.created_at {
             write!(f, " created_at {} AND ", n)?;
         }
         if let Some(n) = &self.id {
-            write!(f, "  id {} AND ", n)?;
+            write!(f, " id {} AND ", n)?;
         }
 
         match self {
             UsersFilterInput { and: Some(and), .. } => {
                 for b in and {
-                    let mut x = "".to_string();
-                    if let UsersFilterInput { id: Some(id), .. } = &b {
-                        x = format!("id {} AND {} ", id, x).to_string();
-                    }
-                    if let UsersFilterInput {
-                        username: Some(username),
-                        ..
-                    } = &b
-                    {
-                        x = format!(" username {} AND {}", username, x).to_string();
-                    }
-                    write!(f, "{}", &x)?;
+                    use std::fmt::Write;
+                    let xbs = "";
+                    or = true;
+                    write!(f, "[AND]{}", b)?
+                    // let mut x = "".to_string();
+                    // if let UsersFilterInput { id: Some(id), .. } = &b {
+                    //     x = format!("id {} AND {} ", id, x).to_string();
+                    // }
+                    // if let UsersFilterInput {
+                    //     username: Some(username),
+                    //     ..
+                    // } = &b
+                    // {
+                    //     x = format!(" username {} AND {}", username, x).to_string();
+                    // }
+                    // write!(f, "{}", &x)?;
                 }
             }
             _ => write!(f, "")?,
@@ -545,25 +561,25 @@ impl std::fmt::Display for UsersFilterInput {
         match self {
             UsersFilterInput { or: Some(or), .. } => {
                 for b in or {
-                    let mut x = "".to_string();
-                    if let UsersFilterInput { id: Some(id), .. } = &b {
-                        x = format!("id {} OR {} ", id, x).to_string();
-                    }
-                    if let UsersFilterInput {
-                        username: Some(username),
-                        ..
-                    } = &b
-                    {
-                        x = format!(" username {} OR {}", username, x).to_string();
-                    }
-                    if let UsersFilterInput {
-                        created_at: Some(created_at),
-                        ..
-                    } = &b
-                    {
-                        x = format!(" created_at {} OR {}", created_at, x).to_string();
-                    }
-                    write!(f, "{}", &x)?;
+                    // let mut x = "".to_string();
+                    // if let UsersFilterInput { id: Some(id), .. } = &b {
+                    //     x = format!("id {} OR {} ", id, x).to_string();
+                    // }
+                    // if let UsersFilterInput {
+                    //     username: Some(username),
+                    //     ..
+                    // } = &b
+                    // {
+                    //     x = format!(" username {} OR {}", username, x).to_string();
+                    // }
+                    // if let UsersFilterInput {
+                    //     created_at: Some(created_at),
+                    //     ..
+                    // } = &b
+                    // {
+                    //     x = format!(" created_at {} OR {}", created_at, x).to_string();
+                    // }
+                    write!(f, "[OR]{}", b)?;
                 }
             }
             _ => write!(f, "")?,
@@ -705,8 +721,136 @@ impl QueryRoot {
     ) -> ConnectionResult<User>
 // Result<Connection<String, User, ConnectionFields, EmptyFields>>
     {
+        let cool = serde_json::to_string(&filter.as_ref().unwrap()).unwrap();
+        let cool2: HashMap<String, serde_json::Value> =
+            serde_json::from_str(cool.as_ref()).unwrap();
+        let mut s = "".to_string();
+
+        let mut numbers: Vec<i32> = vec![];
+        let mut strings: Vec<String> = vec![];
+
+        for (key, value) in cool2.iter() {
+            // println!("{} {}", key, value);
+            if value.is_object() {
+                // s.push_str(&*value.as_str().unwrap().to_string())
+                // for b in value {}
+                // s.push_sr(&data.pointer(&*format!("/{key}/1", key)))
+                // s.push_str(value.clone().take().as_str().unwrap())
+                s.push_str(key);
+                if let Some(b) = value.get("equals") {
+                    // s.push_str(" = ? ");
+                    s.push_str(" = ");
+                    // match b.to_string().parse::<i32>() {
+                    //     Ok(num) => {
+                    //         numbers.push(num);
+                    //     }
+                    //     _ => {
+                    //         strings.push(b.to_string());
+                    //     }
+                    // }
+                    // TODO: Prevent SQL injection
+                    if (b.is_string()) {
+                        s.push_str(&*format!("'{}'", b.as_str().unwrap()));
+                    } else {
+                        s.push_str(&*format!("{}", b));
+                    }
+                }
+                s.push_str(" AND ");
+                // println!("nnnnnn {:?}", value.get(1));
+            }
+            if value.is_array() {
+                // value.keys();
+                let n = value.as_array().unwrap();
+                // let cool10: HashMap<String, serde_json::Value> =
+                //     serde_json::from_str(&value.to_string()).unwrap();
+                // println!("{:?}", cool10);
+                for i in n.iter() {
+                    // let cool10: HashMap<String, serde_json::Value> =
+                    //     serde_json::from_str(&i.to_string()).unwrap();
+                    // for (x, bbb) in cool10.iter() {
+                    //     println!("{}", x);
+                    //     s.push_str(x);
+                    //     if let Some(b) = bbb.get("equals") {
+                    //         s.push_str(" = ");
+                    //         s.push_str(&*b.to_string());
+                    //     }
+                    //     s.push_str(" AND ");
+                    // }
+
+                    let mut index = 0;
+                    let bbb = i.as_object().unwrap();
+                    for (key2, value2) in bbb {
+                        // println!("thekey {} ---  {}", key, key2);
+                        if key == "not" {
+                            s.push_str(&*format!(" {} ", key.to_uppercase()));
+                        }
+
+                        s.push_str(key2);
+
+                        if let Some(b) = value2.get("equals") {
+                            // s.push_str(" = ? ");
+                            s.push_str(" = ");
+                            // match b.to_string().parse::<i32>() {
+                            //     Ok(num) => {
+                            //         numbers.push(num);
+                            //     }
+                            //     _ => {
+                            //         strings.push(b.to_string());
+                            //     }
+                            // }
+                            // TODO: Prevent SQL injection
+                            if (b.is_string()) {
+                                s.push_str(&*format!("'{}'", b.as_str().unwrap()));
+                            } else {
+                                s.push_str(&*format!("{}", b));
+                            }
+                        }
+                        println!("index {} length {}", index, bbb.len());
+                        if (bbb.len() == 1 || bbb.len() - 1 == index) {
+                            s.push_str(" AND ");
+                        } else {
+                            if (key == "not") {
+                                s.push_str(" AND ");
+                            } else {
+                                s.push_str(&*format!(" {} ", key.to_uppercase()));
+                            }
+                        }
+                        index += 1;
+                    }
+
+                    // println!("{}", cool10.get(0).unwrap());
+                    // if let Some(nn) = i.get("created_at") {
+                    //     println!("coo {}", nn);
+                    // }
+                    // println!("{}", i.get(0).unwrap());
+                    // let x = i.as_object().unwrap();
+                    // x.clone()[&0];
+                    // s.push_str(key2);
+                    // println!("{}\n", i);
+                }
+                // s.push_str(&value.get(0).unwrap().get(0).unwrap().to_string());
+            }
+            // s.push_str("test")
+        }
+        // println!("ozyoriginal {:?}", cool2);
+        println!("strings {:?} numbers {:?}", strings, numbers);
+        println!("ozy {}", s);
+        // cool2.
+
         let pool = context.data::<PgPool>().unwrap();
-        let _filter_string: String = filter.map(|c| c.to_string()).unwrap_or_default();
+
+        // // test query
+        // let mut q = sqlx::query(&*s);
+        // for n in (0..strings.len()) {
+        //     q = q.bind(&strings[n]);
+        // }
+        // for n in (0..numbers.len()) {
+        //     q = q.bind(&numbers[n]);
+        // }
+        // let x = q.fetch_all(&*pool);
+
+        let _filter_string: String = s; //filter.map(|c| c.to_string()).unwrap_or_default();
+                                        // println!("{}", _filter_string);
         let regex = Regex::new(r"(AND|OR)$")?;
         let filter_string = if _filter_string.len() > 0 {
             format!(
@@ -854,5 +998,46 @@ impl MutationRoot {
     ) -> Result<i32, IncorrectLoginCredentials> {
         let pool = ctx.data::<PgPool>().unwrap();
         Ok(0)
+    }
+}
+
+fn bla(t: UsersFilterInput) -> String {
+    // let mut filters = Vec::new();
+    // let mut bindings = Vec::new();
+    //
+    // // We add the filters as needed.
+    // //     if let Some(age) = age_filter.as_ref() {
+    // //         filters.push("age > $min_age");
+    // //         bindings.push(("min_age", age as Parameter));
+    // //     }
+    // let UsersFilterInput { username, .. } = t;
+    // println!("{:?}", us);
+    return "".to_string();
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::graphql::resolvers::{bla, Condition, UsersFilterInput};
+    use std::ptr::eq;
+
+    #[test]
+    fn it_works() {
+        assert_eq!(
+            bla(UsersFilterInput {
+                not: Box::new(None),
+                and: None,
+                or: None,
+                username: None,
+                id: Some(Condition {
+                    equals: Some(1),
+                    like: None,
+                    greater_than: None,
+                    less_than: None,
+                    inside: None
+                }),
+                created_at: None
+            }),
+            "id = 1".to_string()
+        );
     }
 }
