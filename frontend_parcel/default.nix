@@ -8,12 +8,12 @@ in napalm.buildPackage ./. {
   #   mkdir -p $out/var/www/static
   #       cp -r static $out/var/www/static
   #     '';
-  postInstall = ''
+  # postInstall = ''
 
-    ls $out
-        pwd
-               mkdir -p $out/share/static/
-                     cp -rf static $out/share/static/
-      '';
+  #   ls $out
+  #       pwd
+  #              mkdir -p $out/share/static/
+  #                    cp -rf static $out/share/static/
+  #     '';
   npmCommands = [ "patchShebangs node_modules" " npm run parcel:build" ];
 }

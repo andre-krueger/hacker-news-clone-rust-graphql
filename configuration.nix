@@ -57,7 +57,7 @@ in lib.mkMerge [
 
     nixos-shell.mounts.extraMounts = {
       "/var/www/postcard-website/frontend" = {
-        target = ./frontend_parcel;
+        target = ./backend;
         cache = "none";
       };
       "/var/www/postcard-website/backend" = {

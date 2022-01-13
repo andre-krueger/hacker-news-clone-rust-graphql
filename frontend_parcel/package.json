@@ -4,8 +4,8 @@
   "description": "",
   "scripts": {
     "parcel:dev": "parcel src/templates/admin.html src/templates/guestbook.html",
-    "parcel:build": "parcel build src/templates/admin.html src/templates/guestbook.html --dist-dir ../backend/static --public-url static",
-    "parcel:build-unoptimized": "parcel build src/templates/admin.html src/templates/guestbook.html --dist-dir ../backend/static --public-url static --no-content-hash --no-optimize",
+    "parcel:build": "parcel build src/templates/admin.html src/templates/guestbook.html --dist-dir ../backend/static --public-url /static",
+    "parcel:build-unoptimized": "parcel build src/templates/admin.html src/templates/guestbook.html --dist-dir ../backend/static --public-url /static --no-content-hash --no-optimize",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "react": "17.0.2",
-    "react-dom": "17.0.2"
+    "react-dom": "17.0.2",
+    "react-location": "3.3.0"
   },
   "parcel-namer-rewrite": {
     "chain": "@parcel/namer-default",

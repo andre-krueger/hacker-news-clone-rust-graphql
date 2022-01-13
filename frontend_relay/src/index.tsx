@@ -15,8 +15,21 @@ import {
 } from "react-relay/hooks";
 import RelayEnvironment from "./RelayEnvironment";
 import graphql from "babel-plugin-relay/macro";
-import { usePaginationFragment } from "react-relay";
+import { useMutation, usePaginationFragment } from "react-relay";
 import srcindexQueryGraphql from "./__generated__/srcindexQuery.graphql";
+
+export const deleteMutation = graphql`
+  mutation srcindexDeleteMutation {
+    deleteUser(id: 1)
+  }
+`;
+const feedbackLikeMutation = graphql`
+  mutation srcindexMutation {
+    login(username: "andre", password: "andre") {
+      username
+    }
+  }
+`;
 
 const appFragment = graphql`
   fragment srcindexFragment on QueryRoot
@@ -50,6 +63,9 @@ function About() {
     data: { bla },
   } = useMatch() as any;
 
+  const [commit] = useMutation(feedbackLikeMutation);
+  const [commit2] = useMutation(deleteMutation);
+
   const _data = usePreloadedQuery(
     graphql`
       query srcindexQuery(
@@ -69,20 +85,37 @@ function About() {
   const { data, loadNext, loadPrevious, refetch, isLoadingNext } =
     usePaginationFragment(appFragment, _data as any);
   console.log(data);
-  return <h1>test</h1>;
+  return (
+    <>
+      <h1>test</h1>
+      <button onClick={() => commit({ variables: {} })}>login</button>
+      <button
+        onClick={() =>
+          commit2({
+            variables: {},
+            onCompleted() {
+              console.log("done");
+            },
+          })
+        }
+      >
+        delete
+      </button>
+    </>
+  );
 }
 
 const routes = [
   {
     path: "/",
     element: (
-      <Link preload={500} to={"/about"}>
+      <Link preload={1} to={"/admin"}>
         about
       </Link>
     ),
   },
   {
-    path: "about",
+    path: "admin",
     loader: () => ({
       // bla: await fetch("http://localhost:3000"),
       bla: loadQuery(
