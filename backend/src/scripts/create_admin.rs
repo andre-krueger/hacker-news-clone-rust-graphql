@@ -36,13 +36,13 @@ async fn main() {
     .await
     .unwrap();
 
-    sqlx::query(
+    sqlx::query!(
         "INSERT INTO user_roles(user_id, role_id) VALUES ($1, $2)",
-        // id,
-        // 1
+        id.0,
+        1
     )
-    .bind(id.0)
-    .bind(1)
+    // .bind(id.0)
+    // .bind(1)
     .execute(&pool)
     .await
     .unwrap();
