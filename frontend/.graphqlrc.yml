@@ -1,0 +1,7 @@
+schema: ${SCHEMA_URL}
+extensions:
+  codegen:
+    generates:
+      ./schema.graphql:
+        plugins:
+          - schema-ast

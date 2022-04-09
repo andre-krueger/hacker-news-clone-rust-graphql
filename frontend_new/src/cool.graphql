@@ -1,0 +1,22 @@
+query test($first: Int, $after: String, $filter: UsersFilterInput) {
+  numbers(first: $first, after: $after, filter: $filter) {
+    __typename
+    edges {
+      __typename
+      node {
+        __typename
+        id
+        username
+      }
+    }
+    paginationVec
+    pageInfo {
+      __typename
+      hasPreviousPage
+      hasNextPage
+      startCursor
+      endCursor
+    }
+    totalCount
+  }
+}
